@@ -4,6 +4,7 @@ import Link from 'next/link';
 import SignOutButton from './SignOutButton';
 const db = require('../../src/db');
 const S = require('../../lib/session');
+const A = require('../../lib/authz');
 
 export const dynamic = 'force-dynamic';
 
@@ -68,7 +69,12 @@ export default async function Dashboard() {
     <>
       <DemoBanner tenant={user.tenant} />
       <GovStrip />
-      <PlatformBar user={user}><SignOutButton /></PlatformBar>
+      <PlatformBar user={user}>
+        {A.isAdmin(user) ? (
+          <Link className="linkbtn" href="/admin" data-testid="to-admin">المتعلّمون</Link>
+        ) : null}
+        <SignOutButton />
+      </PlatformBar>
 
       <main className="wrap">
         <h1>أهلًا، {user.full_name_ar}</h1>

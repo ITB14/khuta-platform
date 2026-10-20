@@ -60,7 +60,12 @@ async function currentUser() {
   const tenant = await requestTenant();
   return db.withTenant(tenant.id, null, async (c) => {
     const s = await identity.validateSession(c, token);
-    return s ? { ...s.user, tenant } : null;
+    if (!s) return null;
+    // الأدوار تُقرأ مع الجلسة لا من الكوكي: المتصفّح لا يحمل صلاحية قطّ، وسحب
+    // دور من مستخدم يسري على طلبه التالي دون انتظار انتهاء جلسته.
+    const { rows } = await c.query(
+      'select role from user_role_grant where user_id = $1 order by role', [s.user.id]);
+    return { ...s.user, tenant, roles: rows.map((r) => r.role) };
   });
 }
 

@@ -17,6 +17,8 @@ node scripts/seed_demo_user.js >/dev/null
 step "المشاهدة والتسلسل"               node test/playback.test.js
 node scripts/seed_demo_user.js >/dev/null
 step "دورة التقييم كاملة"              node test/assessment.test.js
+node scripts/seed_demo_user.js >/dev/null
+step "التصريح للمسارات الإدارية"       node test/admin.test.js
 
 echo
 echo "══════════════════════════════════════════════════════════"
