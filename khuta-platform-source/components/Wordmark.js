@@ -10,7 +10,7 @@ const FONT = "'IBM Plex Sans Arabic','Helvetica Neue Arabic','Segoe UI',sans-ser
 
 export default function Wordmark({ height = 34, ink = '#FFFFFF', mark = '#B68A35' }) {
   return (
-    <svg viewBox="150 8 245 132" height={height} role="img" aria-label="خُطى"
+    <svg className="wordmark" viewBox="150 8 245 132" height={height} role="img" aria-label="خُطى"
          style={{ display: 'block', overflow: 'visible' }}>
       <text x="388" y="118" textAnchor="start" fontFamily={FONT} fontWeight="700"
             fontSize="108" fill={ink} direction="rtl">خطى</text>

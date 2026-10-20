@@ -68,6 +68,11 @@ const section = (t) => console.log(`\n--- ${t} ---`);
   ok(await wm.count() === 1, 'اسم المنصة في الشريط علامة من ملف الهوية لا نصًّا');
   const dammaFill = await wm.locator('text').last().getAttribute('fill');
   ok(dammaFill === '#B68A35', `وضمّته بالذهبي كما في الهوية — ${dammaFill}`);
+  // قاعدة ‎.brand svg‎ المربّعة كُتبت للرمز لا للكلمة؛ لو طُبّقت على الكلمة
+  // انكمش صندوقها إلى ٢٨×٢٨ وخرجت الحروف فوق جارتيها. فيُقاس الصندوق.
+  const wmBox = await wm.boundingBox();
+  ok(wmBox.width > wmBox.height * 1.5,
+     `وصندوق الكلمة بعرضها لا مربّعًا — ${Math.round(wmBox.width)}×${Math.round(wmBox.height)}`);
   ok(body.includes('من 8 دروس'), 'والتقدّم محسوب من قاعدة البيانات');
   // The seeded learner starts honestly: no pre-assessment taken, so R1 has not
   // opened lesson 1 and R3 has opened nothing after it. All five are locked.

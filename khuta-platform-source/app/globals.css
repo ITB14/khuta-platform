@@ -41,6 +41,8 @@ button,input{font-family:inherit;font-size:inherit}
 .pbar{background:var(--black);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 20px;min-height:54px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:19px;padding:8px 0}
 .brand svg{width:28px;height:28px;flex:none}
+/* الكلمة علامة لا شعارًا مربّعًا: ارتفاعها ثابت وعرضها من نسبتها */
+.brand svg.wordmark{width:auto;height:34px}
 .brand small{font-weight:400;font-size:11.5px;opacity:.7;margin-inline-start:4px}
 .goldline{height:3px;background:var(--gold)}
 .pbar .util{display:flex;align-items:center;gap:10px}
