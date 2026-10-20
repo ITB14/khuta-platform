@@ -129,6 +129,67 @@ async function signIn(call, email, password, secret) {
   const his = await fresh('/admin');
   ok(his.status === 307 || his.status === 302, 'ولا يرى الإدارة هو الآخر');
 
+  section('الكلمة المؤقّتة تُجبره على تغييرها');
+  const gate = await fresh('/dashboard');
+  ok((gate.location || '').includes('/account/password'),
+     'لوحته تُحوّله إلى صفحة تغيير كلمة المرور');
+  const lesson = await fresh('/lesson/1');
+  ok((lesson.location || '').includes('/account/password'),
+     'والدخول المباشر على درس يُحوَّل كذلك — لا التفاف بالرابط');
+
+  const wrongCurrent = await fresh('/api/account/password', {
+    method: 'POST', body: { currentPassword: 'Nope!NotThePass1', newPassword: 'Jadeedah!2027xyz' },
+  });
+  ok(wrongCurrent.status === 401, 'والتغيير يُرفض بكلمة حالية خاطئة');
+
+  const weak = await fresh('/api/account/password', {
+    method: 'POST', body: { currentPassword: made.json.password, newPassword: 'short' },
+  });
+  ok(weak.status === 400, 'وكلمة جديدة ضعيفة تُرفض');
+
+  const same = await fresh('/api/account/password', {
+    method: 'POST', body: { currentPassword: made.json.password, newPassword: made.json.password },
+  });
+  ok(same.status === 400, 'وإعادة الكلمة نفسها تُرفض');
+
+  const CHOSEN = 'Ikhtiyari!2027ab';
+  const changed = await fresh('/api/account/password', {
+    method: 'POST', body: { currentPassword: made.json.password, newPassword: CHOSEN },
+  });
+  ok(changed.status === 200 && changed.json?.ok, 'وبكلمة صالحة يتمّ التغيير');
+  const after = await fresh('/dashboard');
+  ok(after.status === 200, 'ولوحته تُفتح له بعدها');
+
+  section('إعادة التعيين من الإدارة');
+  const stale = client();
+  await signIn(stale, NEW_EMAIL, CHOSEN, made.json.mfaSecret);
+  ok((await stale('/dashboard')).status === 200, 'جلسة قائمة للمتعلّم قبل إعادة التعيين');
+
+  const reset = await admin(`/api/admin/learners/${made.json.userId}/reset`, {
+    method: 'POST', body: { password: true },
+  });
+  ok(reset.status === 200 && reset.json?.password, 'المسؤول أعاد التعيين وعادت كلمة جديدة');
+  ok(reset.json.password !== CHOSEN, 'وهي غير التي اختارها');
+
+  const killed = await stale('/dashboard');
+  ok((killed.location || '').includes('/signin'), 'وجلسته القائمة أُبطلت فورًا');
+
+  const back = client();
+  const in3 = await signIn(back, NEW_EMAIL, reset.json.password, made.json.mfaSecret);
+  ok(in3.status === 200 && in3.json?.ok, 'ويدخل بالكلمة الجديدة');
+  ok(((await back('/dashboard')).location || '').includes('/account/password'),
+     'ويُطلب منه تغييرها هو الآخر');
+
+  section('الحساب الإداري لا يُعاد تعيينه من القائمة');
+  const adminId = await db.withTenant(t.id, null, async (c) => {
+    const { rows } = await c.query('select id from app_user where lower(email)=lower($1)', [EMAIL]);
+    return rows[0].id;
+  });
+  const refused = await admin(`/api/admin/learners/${adminId}/reset`, {
+    method: 'POST', body: { password: true },
+  });
+  ok(refused.status === 403, 'يُردّ بـ403 — رفع الصلاحية وانتزاعها لا يمرّان من هنا');
+
   section('التكرار مرفوض');
   const dup = await admin('/api/admin/learners', {
     method: 'POST', body: { email: NEW_EMAIL, fullNameAr: 'مكرّر' },

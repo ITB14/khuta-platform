@@ -61,6 +61,7 @@ async function learnerView(tenantId, userId) {
 export default async function Dashboard() {
   const user = await S.currentUser();
   if (!user) redirect('/signin');
+  if (A.learnerDenial(user) === 'change-password') redirect('/account/password');
   const { courses, lessons, cert, gates } = await learnerView(user.tenant.id, user.id);
   const c0 = courses[0];
   const live = cert.find((x) => !x.revoked_at);
@@ -73,6 +74,7 @@ export default async function Dashboard() {
         {A.isAdmin(user) ? (
           <Link className="linkbtn" href="/admin" data-testid="to-admin">المتعلّمون</Link>
         ) : null}
+        <Link className="linkbtn" href="/account/password" data-testid="to-password">كلمة المرور</Link>
         <SignOutButton />
       </PlatformBar>
 

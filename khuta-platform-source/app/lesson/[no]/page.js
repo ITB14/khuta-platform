@@ -5,6 +5,7 @@ import SignOutButton from '../../dashboard/SignOutButton';
 import Player from './Player';
 const db = require('../../../src/db');
 const S = require('../../../lib/session');
+const A = require('../../../lib/authz');
 const M = require('../../../lib/media');
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,7 @@ export default async function LessonPage({ params }) {
   const { no } = await params;
   const user = await S.currentUser();
   if (!user) redirect('/signin');
+  if (A.learnerDenial(user) === 'change-password') redirect('/account/password');
 
   const data = await db.withTenant(user.tenant.id, user.id, async (c) => {
     const { rows } = await c.query(`

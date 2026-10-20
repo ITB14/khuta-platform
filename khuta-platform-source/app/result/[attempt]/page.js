@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { GovStrip, PlatformBar, DemoBanner } from '../../../components/Chrome';
 import SignOutButton from '../../dashboard/SignOutButton';
 const S = require('../../../lib/session');
+const AZ = require('../../../lib/authz');
 const A = require('../../../lib/assess');
 
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,7 @@ export default async function ResultPage({ params }) {
   const { attempt } = await params;
   const user = await S.currentUser();
   if (!user) redirect('/signin');
+  if (AZ.learnerDenial(user) === 'change-password') redirect('/account/password');
 
   const data = await A.db.withTenant(user.tenant.id, user.id, async (c) => {
     const a = await A.ownedAttempt(c, user.id, attempt);

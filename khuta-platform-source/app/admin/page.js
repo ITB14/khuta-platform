@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { GovStrip, PlatformBar, DemoBanner } from '../../components/Chrome';
 import SignOutButton from '../dashboard/SignOutButton';
+import RowActions from './RowActions';
 const db = require('../../src/db');
 const S = require('../../lib/session');
 const A = require('../../lib/authz');
@@ -14,6 +15,9 @@ async function roster(tenantId, actorId) {
     // يريده المسؤول — الحالة لكل دورة لا مجموعًا مبهمًا.
     const { rows } = await c.query(`
       select u.id, u.full_name_ar, u.email, u.department, u.status,
+             coalesce(cr.must_change, false) as must_change,
+             exists (select 1 from user_role_grant g2
+                      where g2.user_id = u.id and g2.role <> 'learner') as privileged,
              e.id as enrolment_id, e.cohort, e.state, e.due_at,
              co.title_ar as course_title,
              (select count(*) from lesson l where l.course_id = co.id)::int as lessons,
@@ -34,6 +38,7 @@ async function roster(tenantId, actorId) {
                order by ct.issued_at desc limit 1) as cert_serial
         from app_user u
         join user_role_grant g on g.user_id = u.id and g.role = 'learner'
+        left join user_credential cr on cr.user_id = u.id
         left join enrolment e on e.user_id = u.id
         left join course co on co.id = e.course_id
        order by u.full_name_ar, co.title_ar`);
@@ -100,6 +105,7 @@ export default async function AdminHome() {
                   <th>بعدي</th>
                   <th>المكسب</th>
                   <th>الحالة</th>
+                  <th>الوصول</th>
                 </tr>
               </thead>
               <tbody>
@@ -135,6 +141,18 @@ export default async function AdminHome() {
                           <span className="pill gold">قيد التقدّم</span>
                         ) : (
                           <span className="pill">لم يبدأ</span>
+                        )}
+                        {r.must_change ? (
+                          <div style={{ marginTop: 6 }}>
+                            <span className="pill">كلمة مؤقّتة</span>
+                          </div>
+                        ) : null}
+                      </td>
+                      <td>
+                        {r.privileged ? (
+                          <span className="tiny muted">حساب إداري</span>
+                        ) : (
+                          <RowActions id={r.id} name={r.full_name_ar} />
                         )}
                       </td>
                     </tr>

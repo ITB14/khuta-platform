@@ -53,19 +53,36 @@ async function createUser(c, { email, fullNameAr, fullNameEn = null, employeeNo 
   return rows[0];
 }
 
-async function setPassword(c, userId, password) {
+// mustChange يُرفع حين تكون كلمة المرور مؤقّتة وضعها غير صاحبها — عند إنشاء
+// الحساب أو إعادة التعيين. والمنصّة تمنع التقدّم قبل تغييرها، فكلمة مرور مرّت
+// بيد ثالثة لا تبقى كلمة مرور.
+async function setPassword(c, userId, password, { mustChange = false } = {}) {
   const problems = passwordProblems(password);
   if (problems.length) { const e = new Error('weak password'); e.problems = problems; throw e; }
   const hash = await argon2.hash(password, ARGON);
   await c.query(
-    `insert into user_credential (user_id, tenant_id, password_hash, password_algo)
-     values ($1, current_tenant(), $2, 'argon2id')
+    `insert into user_credential (user_id, tenant_id, password_hash, password_algo, must_change)
+     values ($1, current_tenant(), $2, 'argon2id', $3)
      on conflict (user_id) do update
-       set password_hash = excluded.password_hash, password_updated_at = now(), must_change = false`,
-    [userId, hash]);
+       set password_hash = excluded.password_hash, password_updated_at = now(),
+           must_change = excluded.must_change`,
+    [userId, hash, mustChange]);
   await c.query(`update app_user set status = 'active', updated_at = now()
                   where id = $1 and status = 'invited'`, [userId]);
-  await audit(c, { action: 'user.password_set', objectType: 'app_user', objectId: userId });
+  await audit(c, { action: 'user.password_set', objectType: 'app_user', objectId: userId,
+                   detail: { mustChange } });
+}
+
+/**
+ * تحقّق من كلمة مرور مستخدم معروف الهويّة — لتأكيد صاحب الجلسة قبل تغييرها.
+ * ليس مسار دخول: لا يسجّل محاولة ولا يقفل الحساب، لأن من يغيّر كلمته قد
+ * أثبت هويّته بالفعل، وإقفاله لخطأ مطبعي هنا عقوبة بلا سبب.
+ */
+async function checkPassword(c, userId, password) {
+  const { rows } = await c.query(
+    'select password_hash from user_credential where user_id = $1', [userId]);
+  if (!rows[0]?.password_hash) return false;
+  return argon2.verify(rows[0].password_hash, password || '').catch(() => false);
 }
 
 function passwordProblems(pw) {
@@ -218,7 +235,7 @@ const revokeAllSessions = (c, userId) =>
 
 module.exports = {
   ARGON, LOCKOUT, SESSION_HOURS,
-  createUser, setPassword, passwordProblems,
+  createUser, setPassword, passwordProblems, checkPassword,
   authenticate, lockoutState,
   beginMfaEnrolment, confirmMfaEnrolment, verifyMfa,
   createSession, validateSession, revokeSession, revokeAllSessions,

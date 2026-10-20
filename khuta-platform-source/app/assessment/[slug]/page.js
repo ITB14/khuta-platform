@@ -4,6 +4,7 @@ import { GovStrip, PlatformBar, DemoBanner } from '../../../components/Chrome';
 import SignOutButton from '../../dashboard/SignOutButton';
 import Quiz from './Quiz';
 const S = require('../../../lib/session');
+const AZ = require('../../../lib/authz');
 const A = require('../../../lib/assess');
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,7 @@ export default async function AssessmentPage({ params }) {
   const { slug } = await params;
   const user = await S.currentUser();
   if (!user) redirect('/signin');
+  if (AZ.learnerDenial(user) === 'change-password') redirect('/account/password');
 
   const parsed = A.parseSlug(slug);
   if (!parsed) redirect('/dashboard');

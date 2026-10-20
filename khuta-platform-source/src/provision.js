@@ -55,7 +55,9 @@ async function provisionLearner(c, {
   const u = await identity.createUser(c, {
     email, fullNameAr, employeeNo, department, jobTitle,
   });
-  await identity.setPassword(c, u.id, pw);
+  // مؤقّتة بحكم أنها مرّت بيد من أنشأ الحساب: المنصّة تمنع التقدّم قبل أن
+  // يضع المتعلّم كلمة يعرفها وحده.
+  await identity.setPassword(c, u.id, pw, { mustChange: true });
 
   // دور المتعلّم وحده. لا يمنح هذا الطريق أي دور آخر مهما كان المنادي، فرفع
   // الصلاحية يبقى عملية منفصلة ومقصودة.
@@ -96,4 +98,30 @@ async function provisionLearner(c, {
   };
 }
 
-module.exports = { provisionLearner, generatePassword };
+/**
+ * إعادة تعيين كلمة مرور متعلّم: كلمة مؤقّتة جديدة، وإبطال كل جلساته.
+ * الإبطال ليس زيادة احتياط — من فقد الوصول قد يكون فقده لأن غيره يملكه.
+ */
+async function resetPassword(c, userId, { via = 'unknown' } = {}) {
+  const pw = generatePassword();
+  await identity.setPassword(c, userId, pw, { mustChange: true });
+  await identity.revokeAllSessions(c, userId);
+  await db.audit(c, { action: 'user.password_reset', objectType: 'app_user',
+                      objectId: userId, detail: { via } });
+  return { password: pw };
+}
+
+/**
+ * إعادة تسجيل المصادقة الثنائية: سرّ جديد يُسلَّم لصاحبه، والقديم يبطل.
+ * الجلسات تُبطَل كذلك، فمن يحمل جلسة بالعامل القديم لا يبقى داخلًا.
+ */
+async function resetMfa(c, userId, { email, via = 'unknown' } = {}) {
+  const m = await identity.beginMfaEnrolment(c, userId, { account: email });
+  await identity.confirmMfaEnrolment(c, userId, totp.totp(m.secret));
+  await identity.revokeAllSessions(c, userId);
+  await db.audit(c, { action: 'user.mfa_reset', objectType: 'app_user',
+                      objectId: userId, detail: { via } });
+  return { mfaSecret: m.secret, otpauth: m.uri };
+}
+
+module.exports = { provisionLearner, generatePassword, resetPassword, resetMfa };

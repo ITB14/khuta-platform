@@ -49,7 +49,8 @@ export default function NewLearnerForm({ courses }) {
           </dl>
           <p className="tiny" style={{ marginTop: 12 }}>
             يُضاف السرّ في تطبيق المصادقة (Microsoft Authenticator أو ما يماثله)
-            بإدخاله يدويًّا باسم الحساب نفسه.
+            بإدخاله يدويًّا باسم الحساب نفسه. وكلمة المرور هذه مؤقّتة: تُطلب منه
+            كلمة خاصّة به عند أوّل دخول قبل أن تُفتح له الدروس.
           </p>
         </div>
 

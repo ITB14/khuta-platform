@@ -62,10 +62,19 @@ async function currentUser() {
     const s = await identity.validateSession(c, token);
     if (!s) return null;
     // الأدوار تُقرأ مع الجلسة لا من الكوكي: المتصفّح لا يحمل صلاحية قطّ، وسحب
-    // دور من مستخدم يسري على طلبه التالي دون انتظار انتهاء جلسته.
-    const { rows } = await c.query(
-      'select role from user_role_grant where user_id = $1 order by role', [s.user.id]);
-    return { ...s.user, tenant, roles: rows.map((r) => r.role) };
+    // دور من مستخدم يسري على طلبه التالي دون انتظار انتهاء جلسته. و must_change
+    // معها في الاستعلام نفسه، فحالة الحساب كلّها تأتي في جولة واحدة.
+    const { rows } = await c.query(`
+      select coalesce((select array_agg(g.role::text order by g.role)
+                         from user_role_grant g where g.user_id = $1), '{}') as roles,
+             coalesce((select cr.must_change
+                         from user_credential cr where cr.user_id = $1), false) as must_change`,
+      [s.user.id]);
+    return {
+      ...s.user, tenant,
+      roles: rows[0].roles,
+      mustChangePassword: rows[0].must_change,
+    };
   });
 }
 

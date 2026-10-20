@@ -37,4 +37,15 @@ function guardAdmin(user) {
   return null;
 }
 
-module.exports = { hasRole, isAdmin, adminDenial, guardAdmin };
+/**
+ * كلمة مرور مؤقّتة وضعها غير صاحبها لا تُترك قائمة: كل صفحة متعلّم تمرّ من
+ * هنا فتُحوَّل إلى صفحة التغيير. وهذا انضباط تشغيلي لا حدّ أمني — صاحبها
+ * دخل فعلًا — ولذلك يكفي حجب الصفحات دون مسارات البيانات.
+ */
+function learnerDenial(user) {
+  if (!user) return 'signin';
+  if (user.mustChangePassword) return 'change-password';
+  return null;
+}
+
+module.exports = { hasRole, isAdmin, adminDenial, guardAdmin, learnerDenial };
