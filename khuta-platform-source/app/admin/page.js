@@ -74,7 +74,11 @@ export default async function AdminHome() {
       <main className="wrap">
         <div className="between" style={{ marginBottom: 6 }}>
           <h1>المتعلّمون</h1>
-          <Link className="btn gold" href="/admin/new" data-testid="add-learner">إضافة متعلّم</Link>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <a className="linkbtn" href="/api/admin/export" data-testid="export">تصدير CSV</a>
+            <Link className="linkbtn" href="/admin/import" data-testid="import">استيراد دفعة</Link>
+            <Link className="btn gold" href="/admin/new" data-testid="add-learner">إضافة متعلّم</Link>
+          </div>
         </div>
         <p className="muted" style={{ marginBottom: 20 }}>
           حالة كل متعلّم في جهتك. الدرجات كما احتسبها الخادم، لا كما أرسلها المتصفّح.
@@ -116,7 +120,12 @@ export default async function AdminHome() {
                   return (
                     <tr key={`${r.id}-${r.enrolment_id || 'none'}`}>
                       <td>
-                        <b>{r.full_name_ar}</b>
+                        <Link href={`/admin/learners/${r.id}`} data-testid={`open-${r.id}`}>
+                          <b>{r.full_name_ar}</b>
+                        </Link>
+                        {r.status === 'suspended' ? (
+                          <span className="pill" style={{ marginInlineStart: 8 }}>موقوف</span>
+                        ) : null}
                         <div className="tiny ltr muted">{r.email}</div>
                       </td>
                       <td>{r.department || '—'}</td>
@@ -134,7 +143,9 @@ export default async function AdminHome() {
                       </td>
                       <td>
                         {r.cert_serial ? (
-                          <span className="pill ok">شهادة {r.cert_serial}</span>
+                          <Link className="pill ok" href={`/certificate/${encodeURIComponent(r.cert_serial)}`}>
+                            شهادة {r.cert_serial}
+                          </Link>
                         ) : r.enrolment_id && r.done === r.lessons && r.lessons > 0 ? (
                           <span className="pill gold">بانتظار التقييم البعدي</span>
                         ) : pre !== null ? (

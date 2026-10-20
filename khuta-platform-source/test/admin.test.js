@@ -25,7 +25,10 @@ const section = (t) => console.log(`\n--- ${t} ---`);
 /** عميل بسلّة كعك خاصّة به، كي يتعايش مستخدمان في الاختبار نفسه. */
 function client() {
   let jar = '';
-  return async function call(path, { method = 'GET', body } = {}) {
+  call.cookie = () => jar;              // لفحص يحتاج الطلب الخام لا المغلّف
+  return call;
+
+  async function call(path, { method = 'GET', body } = {}) {
     const r = await fetch(BASE + path, {
       method,
       headers: { 'content-type': 'application/json', ...(jar ? { cookie: jar } : {}) },
@@ -201,9 +204,135 @@ async function signIn(call, email, password, secret) {
   });
   ok(bad.status === 400, 'وبريد غير صالح يُرفض');
 
+  section('تصدير القائمة');
+  // `back` متعلّم مستقلّ. و`learner` هو المستخدم نفسه الذي مُنح الدور بعدُ،
+  // فجلسته صارت إدارية — الأدوار تُقرأ كل طلب، وهذه نتيجتها المقصودة.
+  const csvDenied = await back('/api/admin/export');
+  ok(csvDenied.status === 403, 'متعلّم لا يصدّر');
+  const csv = await admin('/api/admin/export');
+  ok(csv.status === 200, 'والمسؤول يصدّر');
+  // بالبايتات لا بالنصّ: `Response.text()` يحذف علامة الترتيب عند فكّ
+  // الترميز، فالفحص عليها من خلاله يمرّ دائمًا ولا يفحص شيئًا.
+  const rawCsv = await fetch(`${BASE}/api/admin/export`, { headers: { cookie: admin.cookie() } });
+  const head3 = new Uint8Array((await rawCsv.arrayBuffer()).slice(0, 3));
+  ok(head3[0] === 0xEF && head3[1] === 0xBB && head3[2] === 0xBF,
+     'والملف يبدأ بعلامة ترتيب البايتات — بدونها يشوّه Excel العربية');
+  ok(csv.text.includes('البريد') && csv.text.includes(NEW_EMAIL),
+     'وفيه العناوين والمتعلّمون');
+  ok(!csv.text.includes(reset.json.password),
+     'ولا يحمل كلمات مرور — يُرسل بالبريد ويُحفظ على أجهزة لا تحكمها المنصّة');
+
+  section('تعديل بيانات متعلّم');
+  const edited = await admin(`/api/admin/learners/${made.json.userId}`, {
+    method: 'PATCH', body: { department: 'الشؤون الهندسية', jobTitle: 'مهندس' },
+  });
+  ok(edited.status === 200 && edited.json.learner.department === 'الشؤون الهندسية',
+     'الإدارة تُحدَّث');
+  const cleared = await admin(`/api/admin/learners/${made.json.userId}`, {
+    method: 'PATCH', body: { department: '' },
+  });
+  ok(cleared.status === 200 && cleared.json.learner.department === null,
+     'وحقل أُرسل فارغًا يُمسح فعلًا — لا يبقى كما كان');
+  ok(cleared.json.learner.job_title === 'مهندس',
+     'وحقل لم يُرسل يبقى كما هو');
+  const emptyName = await admin(`/api/admin/learners/${made.json.userId}`, {
+    method: 'PATCH', body: { fullNameAr: '  ' },
+  });
+  ok(emptyName.status === 400, 'والاسم لا يُفرَّغ');
+  const editPriv = await admin(`/api/admin/learners/${adminId}`, {
+    method: 'PATCH', body: { department: 'x' },
+  });
+  ok(editPriv.status === 403, 'والحساب الإداري لا يُعدَّل من هنا');
+
+  section('استيراد دفعة من ملف');
+  const BULK_A = `bulk1+${Date.now()}@alain.example`;
+  const BULK_B = `bulk2+${Date.now()}@alain.example`;
+  const csvIn = [
+    'الاسم,البريد,الإدارة',
+    `خالد سعيد النعيمي,${BULK_A},الصحة العامة`,
+    `عائشة راشد الظاهري,${BULK_B},التخطيط`,
+    `مكرّر,${BULK_A},س`,
+    'بلا بريد,,س',
+    'بريد خاطئ,ليس-بريدًا,س',
+  ].join('\n');
+  const bulkDenied = await back('/api/admin/learners/bulk', { method: 'POST', body: { csv: csvIn } });
+  ok(bulkDenied.status === 403, 'متعلّم لا يستورد');
+
+  const bulk = await admin('/api/admin/learners/bulk', { method: 'POST', body: { csv: csvIn } });
+  ok(bulk.status === 200 && bulk.json.created === 2, 'صفّان صحيحان أُنشئا');
+  ok(bulk.json.failed === 3, 'وثلاثة فشلت');
+  const reasons = bulk.json.results.filter((r) => !r.ok).map((r) => r.error).join(' | ');
+  ok(/مكرّر داخل الملف/.test(reasons), 'والمكرّر داخل الملف يُسمّى بسببه');
+  ok(/بريد غير صالح/.test(reasons), 'والبريد الخاطئ كذلك');
+  ok(bulk.json.results.filter((r) => !r.ok).every((r) => r.line >= 2),
+     'وكل فشل يحمل رقم سطره في الملف');
+  ok((await roles(BULK_A)).join() === 'learner', 'والمستورَد دوره learner');
+
+  const bulkNoCol = await admin('/api/admin/learners/bulk', {
+    method: 'POST', body: { csv: 'الاسم,الإدارة\nس,ص' },
+  });
+  ok(bulkNoCol.status === 400 && /البريد/.test(bulkNoCol.json.error || ''),
+     'وملفّ بلا عمود بريد يُرفض مرّة واحدة بسببه');
+
+  section('صفحة الشهادة');
+  const cert = await db.withTenant(t.id, null, async (c) => {
+    const { rows } = await c.query(`
+      insert into certificate (tenant_id, enrolment_id, serial, verify_code,
+                               issued_to_name, course_title, score, content_hash)
+      select current_tenant(), e.id, 'KHT-TEST-0001', 'TEST-0001',
+             u.full_name_ar, co.title_ar, 0.900, sha256('x')
+        from enrolment e join app_user u on u.id = e.user_id
+        join course co on co.id = e.course_id
+       where lower(u.email) = lower($1) limit 1
+      returning serial`, [EMAIL]);
+    return rows[0];
+  });
+  ok(!!cert, 'شهادة تجريبية للمتعلّم صاحب الجلسة');
+
+  const mine = await learner(`/certificate/${cert.serial}`);
+  ok(mine.status === 200 && mine.text.includes('شهادة إتمام دورة'), 'صاحبها يراها');
+
+  // متعلّم من الدفعة المستورَدة — حساب مستقلّ تمامًا عن صاحب الشهادة.
+  const madeA = bulk.json.results.find((r) => r.ok && r.email === BULK_A);
+  const other = client();
+  await signIn(other, BULK_A, madeA.password, madeA.mfaSecret);
+  // يغيّر كلمته المؤقّتة أوّلًا، وإلّا حوّله حاجزها قبل أن يُفحص مالك الشهادة
+  await other('/api/account/password', {
+    method: 'POST', body: { currentPassword: madeA.password, newPassword: 'Mustaqil!2027aa' },
+  });
+  const notMine = await other(`/certificate/${cert.serial}`);
+  ok(notMine.status === 404, 'ومتعلّم آخر لا يراها — ورقمها ليس مفتاحًا');
+
+  const byAdmin = await admin(`/certificate/${cert.serial}`);
+  ok(byAdmin.status === 200, 'والمسؤول يراها ليطبع نسخة');
+  const ghost = await learner('/certificate/KHT-LA-YUJAD');
+  ok(ghost.status === 404, 'ورقم لا وجود له يردّ 404');
+
+  section('إيقاف الحساب');
+  const live2 = client();
+  await signIn(live2, NEW_EMAIL, reset.json.password, made.json.mfaSecret);
+  const stopped = await admin(`/api/admin/learners/${made.json.userId}`, {
+    method: 'PATCH', body: { status: 'suspended' },
+  });
+  ok(stopped.status === 200 && stopped.json.learner.status === 'suspended', 'أُوقف');
+  ok(((await live2('/dashboard')).location || '').includes('/signin'),
+     'وجلسته القائمة سقطت في الطلب التالي');
+  const blocked = await client()('/api/auth/signin', {
+    method: 'POST', body: { email: NEW_EMAIL, password: reset.json.password },
+  });
+  ok(blocked.status === 401 && /موقوف/.test(blocked.json?.message || ''),
+     'ولا يدخل من جديد — ويُقال له إن الحساب موقوف');
+  const resumed = await admin(`/api/admin/learners/${made.json.userId}`, {
+    method: 'PATCH', body: { status: 'active' },
+  });
+  ok(resumed.status === 200 && resumed.json.learner.status === 'active', 'وإعادة التفعيل تردّه');
+
   // ---------------------------------------------------------------- cleanup
   await db.withTenant(t.id, null, (c) =>
-    c.query('delete from app_user where lower(email) = lower($1)', [NEW_EMAIL]));
+    c.query('delete from app_user where lower(email) = any($1::text[])',
+            [[NEW_EMAIL.toLowerCase(), BULK_A.toLowerCase(), BULK_B.toLowerCase()]]));
+  await db.withTenant(t.id, null, (c) =>
+    c.query(`delete from certificate where serial = 'KHT-TEST-0001'`));
   await setAdmin(false);
 
   console.log(`\n==========================================================`);

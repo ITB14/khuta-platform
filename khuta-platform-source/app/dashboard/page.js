@@ -168,7 +168,10 @@ export default async function Dashboard() {
                   الرقم <span className="serial">{live.serial}</span> · رمز التحقّق{' '}
                   <span className="code">{live.verify_code}</span>
                 </p>
-                <Link className="btn gold" href={`/verify?code=${live.verify_code}`}>صفحة التحقّق</Link>
+                <Link className="btn gold" href={`/certificate/${encodeURIComponent(live.serial)}`}
+                      data-testid="to-cert">عرض الشهادة وطباعتها</Link>
+                <Link className="linkbtn" style={{ marginInlineStart: 14 }}
+                      href={`/verify?code=${live.verify_code}`}>صفحة التحقّق</Link>
               </div>
             ) : null}
 

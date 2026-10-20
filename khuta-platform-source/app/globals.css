@@ -130,3 +130,39 @@ button,input{font-family:inherit;font-size:inherit}
 .cert{border:1px solid var(--gold);border-radius:var(--r);padding:22px;background:var(--gold-bg)}
 .cert .serial{font-family:var(--font);font-weight:700;font-size:20px;direction:ltr;display:inline-block}
 .cert .code{letter-spacing:.18em;font-weight:700;direction:ltr;display:inline-block}
+
+/* ========================================================== الشهادة المطبوعة
+   ورقة واحدة تُقرأ على الشاشة وتُطبع كما هي. القياسات بالمليمتر لا بالبكسل
+   لأن وجهتها الورق: A4 أفقي بهامش 12mm. */
+.sheet{background:#fff;border:1px solid var(--line);border-radius:var(--r);
+  padding:34px 40px 30px;box-shadow:var(--shadow);position:relative}
+.sheet::before{content:'';position:absolute;inset:0;border-radius:var(--r);
+  border:2px solid var(--gold-bg);pointer-events:none;margin:8px}
+.sheet-head{display:flex;gap:14px;align-items:center}
+.sheet-crest{width:44px;height:62px;object-fit:contain}
+.sheet-org{font-size:13px;font-weight:600;line-height:1.35}
+.sheet-org.en{font-size:9.5px;font-weight:400;color:var(--ink-3);letter-spacing:.02em;direction:ltr;text-align:start}
+.sheet-rule{height:2px;background:var(--gold);margin:18px 0 22px;border-radius:2px}
+.sheet-kicker{font-size:12.5px;color:var(--gold-deep);font-weight:600;margin:0 0 4px}
+.sheet-title{font-size:27px;font-weight:700;margin:0 0 22px}
+.sheet-lede{font-size:14px;color:var(--ink-2);margin:0}
+.sheet-name{font-size:30px;font-weight:700;margin:8px 0 14px;color:var(--gold-deep)}
+.sheet-course{font-size:20px;font-weight:600;margin:8px 0 24px}
+.sheet-facts{display:flex;gap:34px;flex-wrap:wrap;padding:16px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.sheet-facts b{display:block;font-size:19px;font-weight:700}
+.sheet-facts span{font-size:11.5px;color:var(--ink-2)}
+.sheet-foot{display:flex;gap:40px;flex-wrap:wrap;margin-top:20px}
+.sheet-foot .serial{font-weight:700;font-size:17px}
+.sheet-foot .code{font-weight:700;font-size:17px;letter-spacing:.16em}
+.sheet-note{font-size:11px;color:var(--ink-3);margin-top:18px;line-height:1.7}
+
+@media print{
+  @page{size:A4 landscape;margin:12mm}
+  html,body{background:#fff}
+  .noprint,.gov,.pbar,.goldline,.demo{display:none !important}
+  .wrap{max-width:none;padding:0;margin:0}
+  .sheet{border:none;box-shadow:none;border-radius:0;padding:0 4mm;
+    break-inside:avoid;page-break-inside:avoid}
+  .sheet::before{margin:0;border-color:var(--gold-2)}
+  .alert{border:1px solid var(--err)}
+}

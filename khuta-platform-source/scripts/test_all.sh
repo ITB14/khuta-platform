@@ -10,6 +10,7 @@ step () { echo; echo "════ $1"; shift; "$@" || fails=$((fails+1)); }
 step "قاعدة البيانات من الصفر"        bash scripts/reset_db.sh
 step "فحص القواعد على قاعدة حيّة"     bash -c "psql -h \${PGHOST:-/tmp} -p \${PGPORT:-5433} -U khuta -d khuta -q -f db/003_verify.sql 2>&1 | grep -E 'PASS|FAIL'"
 step "RFC 6238"                        node test/totp.test.js
+step "قراءة CSV"                       node test/csv.test.js
 step "الهوية وكلمات المرور"            node test/identity.test.js
 node scripts/seed_demo_user.js >/dev/null
 step "الواجهة من طرف إلى طرف"          node test/e2e.test.js
