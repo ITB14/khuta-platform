@@ -1,0 +1,80 @@
+# خُطى — نشر على خادم يملك Docker و Traefik.
+#
+# Traefik يأتي مع قالب الخادم ويتكفّل بالشهادة والتوجيه؛ هذا الملف لا يفتح أي
+# منفذ إلى الإنترنت بنفسه. قاعدة البيانات ليس لها منفذ منشور أصلًا: لا يصلها
+# إلا التطبيق عبر شبكة داخلية.
+#
+# يُنشر على شبكة Traefik الموجودة دون تغيير أي خدمة أخرى عليها.
+
+name: khuta
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: khuta
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: khuta
+    volumes:
+      - khuta_pgdata:/var/lib/postgresql/data
+      # تُنفَّذ مرة واحدة عند أول إقلاع، بالترتيب الأبجدي
+      - ../db/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+      - ../db/002_seed_copilot.sql:/docker-entrypoint-initdb.d/002_seed_copilot.sql:ro
+      - ../db/004_tenant_resolve.sql:/docker-entrypoint-initdb.d/004_tenant_resolve.sql:ro
+      - ../db/005_playback.sql:/docker-entrypoint-initdb.d/005_playback.sql:ro
+      - ../db/006_split_media.sql:/docker-entrypoint-initdb.d/006_split_media.sql:ro
+      - ../db/007_webm.sql:/docker-entrypoint-initdb.d/007_webm.sql:ro
+      - ../db/008_assessment.sql:/docker-entrypoint-initdb.d/008_assessment.sql:ro
+      - ./010_app_password.sh:/docker-entrypoint-initdb.d/010_app_password.sh:ro
+    networks: [khuta_internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U khuta -d khuta"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      PGHOST: db
+      PGPORT: "5432"
+      PGUSER: khuta_app
+      PGPASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD}
+      PGDATABASE: khuta
+      KHUTA_SECRET: ${KHUTA_SECRET:?set KHUTA_SECRET}
+      KHUTA_MFA_KEY: ${KHUTA_MFA_KEY:?set KHUTA_MFA_KEY}
+      KHUTA_DEFAULT_TENANT: ${KHUTA_DEFAULT_TENANT:-alain}
+    volumes:
+      # ملفات الدروس خارج الصورة: تُستبدل دون إعادة بناء، ولا تُقدَّم إلا
+      # عبر روابط موقَّعة مرتبطة بالمشاهد.
+      - khuta_media:/app/media
+    networks: [khuta_internal, traefik]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "${TRAEFIK_NETWORK:-traefik-proxy}"
+      traefik.http.routers.khuta.rule: "Host(`${KHUTA_HOST:?set KHUTA_HOST}`)"
+      traefik.http.routers.khuta.entrypoints: "websecure"
+      traefik.http.routers.khuta.tls.certresolver: "${CERT_RESOLVER:-letsencrypt}"
+      traefik.http.services.khuta.loadbalancer.server.port: "3100"
+      # لا HSTS على نطاق فرعي لموقع قائم إلا بقرار صريح، كي لا يتأثر غيره
+      traefik.http.routers.khuta.middlewares: "khuta-headers"
+      traefik.http.middlewares.khuta-headers.headers.frameDeny: "true"
+      traefik.http.middlewares.khuta-headers.headers.contentTypeNosniff: "true"
+      traefik.http.middlewares.khuta-headers.headers.referrerPolicy: "same-origin"
+
+volumes:
+  khuta_pgdata:
+  khuta_media:
+
+networks:
+  khuta_internal:
+    internal: true
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik-proxy}

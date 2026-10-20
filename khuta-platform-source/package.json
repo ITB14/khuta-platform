@@ -1,0 +1,23 @@
+{
+  "name": "khuta-platform",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "db:reset": "bash scripts/reset_db.sh",
+    "test:totp": "node test/totp.test.js",
+    "test:identity": "node test/identity.test.js",
+    "test": "node test/totp.test.js && node test/identity.test.js",
+    "dev": "next dev -p 3100",
+    "build": "next build",
+    "start": "next start -p 3100",
+    "seed:demo": "node scripts/seed_demo_user.js",
+    "test:e2e": "node test/e2e.test.js"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.2.2",
+    "next": "^16.4.2",
+    "pg": "^8.23.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  }
+}
