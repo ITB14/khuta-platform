@@ -47,8 +47,14 @@ button,input{font-family:inherit;font-size:inherit}
 .goldline{height:3px;background:var(--gold)}
 .pbar .util{display:flex;align-items:center;gap:10px}
 .pbar .who{font-size:13px;opacity:.85}
-.linkbtn{background:none;border:0;color:#fff;opacity:.75;font-size:13.5px;padding:6px 2px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+/* كان color:#fff لأن أوّل موضع استُعمل فيه هو الشريط الأسود. وحين استُعمل
+   على خلفية فاتحة صار أبيضَ على كريمي — أي غير مقروء، وأسوأ ما يكون في
+   أزرار تأكيد الإيقاف وإعادة التعيين. اللون يرث الآن، والأبيض يبقى داخل
+   الشريط وحده. */
+.linkbtn{background:none;border:0;color:inherit;opacity:.78;font-size:13.5px;padding:6px 2px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .linkbtn:hover{opacity:1}
+.pbar .linkbtn{color:#fff}
+.linkbtn[disabled]{opacity:.45;cursor:default}
 
 .wrap{max-width:1180px;margin:0 auto;padding:26px 20px 56px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;box-shadow:var(--shadow)}
