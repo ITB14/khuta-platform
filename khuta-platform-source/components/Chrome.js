@@ -1,4 +1,5 @@
 import Mark from './Mark';
+import Wordmark from './Wordmark';
 
 // The government strip is fixed by the Abu Dhabi identity and is never
 // restyled by the platform. Khuta lives in the black bar beneath it.
@@ -6,6 +7,9 @@ export function GovStrip() {
   return (
     <header className="gov">
       <div className="lockup">
+        {/* الشعار الرسمي كما ورد من الجهة — لا يُعاد رسمه ولا يُعاد تلوينه */}
+        <img className="crest" src="/gov/al-ain-municipality.png" alt="" width="40" height="56" />
+        <div className="vr" />
         <div className="wm">
           <span className="a">دائرة البلديات والنقل · بلدية مدينة العين</span>
           <span className="e">DEPARTMENT OF MUNICIPALITIES AND TRANSPORT · AL AIN CITY MUNICIPALITY</span>
@@ -21,7 +25,7 @@ export function PlatformBar({ user, children }) {
       <div className="pbar">
         <div className="brand">
           <Mark />
-          خُطى
+          <Wordmark />
           <small>KHUTA · أكاديمية بلدية مدينة العين</small>
         </div>
         <div className="util">

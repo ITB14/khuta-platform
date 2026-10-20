@@ -5,7 +5,9 @@ FROM node:22-bookworm-slim AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=optional
+# تثبيت كامل عمدًا: ارتباط argon2 الأصلي يأتي بوصفه اعتمادًا اختياريًّا،
+# و --omit=optional يحذفه فيسقط التطبيق عند أول تحقّق من كلمة مرور.
+RUN npm ci
 COPY . .
 RUN npm run build
 

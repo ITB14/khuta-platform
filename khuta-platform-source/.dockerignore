@@ -1,0 +1,11 @@
+node_modules
+.next
+.shots
+.pgdata
+media
+.env.local
+.demo-secret
+.demo-user
+.next-start.log
+deploy/.env
+.git

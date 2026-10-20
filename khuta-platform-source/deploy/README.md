@@ -90,7 +90,14 @@ KHUTA_MFA_KEY=<عشوائية ٦٤ خانة>
 KHUTA_DEFAULT_TENANT=alain
 ```
 
-لتوليد القيم: `openssl rand -hex 32`
+لتوليد القيم:
+
+```
+POSTGRES_PASSWORD / APP_DB_PASSWORD / KHUTA_SECRET :  openssl rand -hex 32
+KHUTA_MFA_KEY                                    :  openssl rand -base64 32
+```
+
+`KHUTA_MFA_KEY` **base64 لـ٣٢ بايت حصرًا** — قيمة سداسية تُرفض عند أول تسجيل مصادقة ثنائية.
 
 > `KHUTA_MFA_KEY` يفكّ تشفير أسرار المصادقة الثنائية. فقدانه يعني أن كل
 > المستخدمين يحتاجون إعادة تسجيل تطبيق المصادقة. احفظه حيث تُحفظ المفاتيح.

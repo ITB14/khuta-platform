@@ -112,7 +112,7 @@ export default async function Dashboard() {
                   ? `اجتزته بدرجة ${Math.round(Number(gates.post.best) * 100)}٪.`
                   : gates.post?.ok
                     ? `${gates.post.n} سؤالًا. درجة النجاح ٧٠٪ والمحاولات ${gates.post.used} من ${gates.post.allowed}.`
-                    : 'يُفتح بعد إكمال الدروس الخمسة واجتياز اختباراتها. عشرة من أسئلته تُقابل أسئلة التقييم القبلي سؤالًا بسؤال.'}
+                    : `يُفتح بعد إكمال الدروس ${lessons.length} واجتياز اختباراتها. ومعظم أسئلته تُقابل أسئلة التقييم القبلي سؤالًا بسؤال.`}
               </p>
               {gates.post?.ok ? (
                 <Link className="btn gold" href="/assessment/post" data-testid="start-post">

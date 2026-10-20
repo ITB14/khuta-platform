@@ -1,9 +1,13 @@
 'use strict';
 // A learner to drive the end-to-end test with. Development only.
-require('node:fs').readFileSync(__dirname + '/../.env.local', 'utf8')
-  .split('\n').filter(Boolean).forEach((l) => {
-    const i = l.indexOf('='); if (i > 0) process.env[l.slice(0, i)] = l.slice(i + 1);
-  });
+// ملف البيئة للتشغيل المحلّي فقط؛ على الخادم تأتي القيم من بيئة الحاوية،
+// فغيابه ليس خطأ.
+try {
+  require('node:fs').readFileSync(__dirname + '/../.env.local', 'utf8')
+    .split('\n').filter(Boolean).forEach((l) => {
+      const i = l.indexOf('='); if (i > 0) process.env[l.slice(0, i)] = l.slice(i + 1);
+    });
+} catch (e) { if (e.code !== 'ENOENT') throw e; }
 const db = require('../src/db');
 const identity = require('../src/identity');
 const totp = require('../src/totp');

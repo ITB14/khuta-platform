@@ -1,0 +1,15 @@
+node_modules/
+.next/
+.pgdata/
+.shots/
+media/
+out/
+
+# أسرار البيئة ولا تُرفع أبدًا
+.env.local
+deploy/.env
+.demo-secret
+.demo-user
+
+.next-start.log
+*.log

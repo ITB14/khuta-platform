@@ -89,6 +89,17 @@ async function answer(started, right) {
   ok(pre.questions.every((q) => q.options.length >= 3 && q.options.every((o) => !('is_correct' in o))),
      'والورقة لا تحمل مفاتيح الإجابات — ر٥');
 
+  // انحدار: فتح التقييم ثم مغادرة الصفحة لا يُحرق محاولة. المحاولة تُحتسب
+  // عند التسليم لا عند الفتح، وإلا حُبس المتعلّم خارج تقييم حدّه محاولة واحدة.
+  const again = (await call('/api/assessment/start', { slug: 'pre' })).json;
+  ok(again.ok === true && again.resumed === true && again.attemptId === pre.attemptId,
+     'ومحاولة مفتوحة لم تُسلَّم تُستأنف بإجاباتها ولا تُحتسب محاولة جديدة');
+  const gate = await db.withTenant(t.id, null, (c) => c.query(
+    `select ok, reason from assessment_gate($1, (select id from assessment where kind='pre'))`,
+    [ctx.enrolment]));
+  ok(gate.rows[0].ok === true,
+     `والبوّابة نفسها تراه مفتوحًا لا مستنفَدًا — ${gate.rows[0].reason}`);
+
   // four right, the rest wrong: a measurable starting point for R8
   const keys = await admin.query(
     `select question_id, id, is_correct from question_option where question_id = any($1::uuid[])`,
