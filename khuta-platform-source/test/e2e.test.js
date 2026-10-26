@@ -74,10 +74,13 @@ const section = (t) => console.log(`\n--- ${t} ---`);
   ok(wmBox.width > wmBox.height * 1.5,
      `وصندوق الكلمة بعرضها لا مربّعًا — ${Math.round(wmBox.width)}×${Math.round(wmBox.height)}`);
   ok(body.includes('من 8 دروس'), 'والتقدّم محسوب من قاعدة البيانات');
-  // The seeded learner starts honestly: no pre-assessment taken, so R1 has not
-  // opened lesson 1 and R3 has opened nothing after it. All five are locked.
+  // المتعلّم المزروع لم يؤدِّ قياسًا قبليًّا، ومع ذلك دروسه الثمانية مفتوحة.
+  // هذا هو التعديل كما يراه المتعلّم لا كما يُقرأ في قاعدة البيانات.
   const locked = await page.locator('.lesson.locked').count();
-  ok(locked === 8, `والدروس الثمانية مقفلة قبل التقييم القبلي — ر١ و ر٣ ظاهرتان في الواجهة (وجدت ${locked})`);
+  ok(locked === 0, `ولا درس مقفل قبل أي تقييم — النمط المفتوح ظاهر في الواجهة (مقفلة: ${locked})`);
+  ok((await page.locator('.lesson a').count()) === 8, 'والدروس الثمانية كلّها قابلة للفتح');
+  ok(body.includes('اعرف مستواك قبل أن تبدأ') && body.includes('أو تجاهله'),
+     'والقياس القبلي معروض كاختيار لا كشرط');
   ok(body.includes('٩٥٪'), 'وقاعدة المشاهدة مشروحة للمتعلّم');
 
   section('تسجيل الخروج');

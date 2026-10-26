@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { GovStrip, PlatformBar, DemoBanner } from '../../../components/Chrome';
 import SignOutButton from '../../dashboard/SignOutButton';
 import Quiz from './Quiz';
+import FinalQuiz from './FinalQuiz';
 const S = require('../../../lib/session');
 const AZ = require('../../../lib/authz');
 const A = require('../../../lib/assess');
@@ -22,6 +23,15 @@ const HEAD = {
     `${n} أسئلة على هذا الدرس وحده. اجتيازها هو ما يفتح الدرس التالي.` },
 };
 
+const OPEN_HEAD = {
+  pre: { title: 'اعرف مستواك قبل أن تبدأ', lead: (n) =>
+    `${n} سؤالًا سريعًا، سؤال لكل مهارة. اختياري تمامًا: لا يفتح شيئًا ولا يقفل شيئًا، `
+    + 'ولا يراه أحد كدرجة. فائدته الوحيدة أن تقارن به معرفتك بعد الدورة.' },
+  post: { title: 'اختبار الشهادة', lead: (n) =>
+    `${n} سؤالًا، سؤال لكل مهارة من مهارات الدورة. ليس امتحانًا: كلّما أخطأت ظهر لك `
+    + 'الصواب وشرحه وأعدت السؤال، بلا حدّ للمحاولات. ومتى أتممت الأسئلة صدرت شهادتك.' },
+};
+
 export default async function AssessmentPage({ params }) {
   const { slug } = await params;
   const user = await S.currentUser();
@@ -34,7 +44,10 @@ export default async function AssessmentPage({ params }) {
   const a = await A.db.withTenant(user.tenant.id, user.id, (c) => A.findAssessment(c, user.id, slug));
   if (!a) redirect('/dashboard');
 
-  const head = HEAD[a.kind];
+  // في النمط المفتوح لا «قبلي» بوّابةً ولا «بعدي» امتحانًا: الأول قياس اختياري،
+  // والثاني اختبار الشهادة. فيتغيّر العنوان والشرح معهما.
+  const open = a.mode === 'open';
+  const head = open && OPEN_HEAD[a.kind] ? OPEN_HEAD[a.kind] : HEAD[a.kind];
   const title = a.kind === 'lesson' ? `اختبار الدرس ${a.lesson_no} — ${a.lesson_title}` : head.title;
 
   return (
@@ -52,9 +65,18 @@ export default async function AssessmentPage({ params }) {
 
         <div className="kpi" style={{ marginBottom: 16 }}>
           <div><b className="num">{a.total}</b><span>عدد الأسئلة</span></div>
-          <div><b className="num">{a.pass_mark ? `${Math.round(Number(a.pass_mark) * 100)}٪` : '—'}</b>
-               <span>درجة النجاح</span></div>
-          <div><b className="num">{a.used} / {a.allowed}</b><span>المحاولات المستخدمة</span></div>
+          {open && a.kind === 'post' ? (
+            <>
+              <div><b className="num">كلّها</b><span>المطلوب لإتمامه</span></div>
+              <div><b className="num">بلا حدّ</b><span>المحاولات</span></div>
+            </>
+          ) : (
+            <>
+              <div><b className="num">{a.pass_mark ? `${Math.round(Number(a.pass_mark) * 100)}٪` : '—'}</b>
+                   <span>درجة النجاح</span></div>
+              <div><b className="num">{a.used} / {a.allowed}</b><span>المحاولات المستخدمة</span></div>
+            </>
+          )}
         </div>
 
         {!a.ok ? (
@@ -62,6 +84,8 @@ export default async function AssessmentPage({ params }) {
             <div className="alert" data-testid="gate">{A.REASONS[a.reason] || 'هذا التقييم غير متاح الآن.'}</div>
             <Link className="btn" href="/dashboard">العودة إلى الرئيسية</Link>
           </div>
+        ) : open && a.kind === 'post' ? (
+          <FinalQuiz slug={slug} total={a.total} />
         ) : (
           <Quiz slug={slug} total={a.total} kind={a.kind} />
         )}

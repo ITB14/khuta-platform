@@ -32,11 +32,12 @@ const PASS = 'Munic1pality!Khuta';
       select current_tenant(), $1, id, 'Q1-2027', 'in_progress', now() + interval '21 days'
         from course where code = 'COP-101' returning id`, [u.id]);
 
-    // The honest starting state: nothing unlocked and no pre-assessment taken.
-    // R1 opens lesson 1; R2 and R3 open the rest. The journey is the demo.
+    // الحالة الصادقة للبداية: لا قياس قبلي مأخوذ. وأمّا الفتح فبحسب نمط
+    // الدورة — مفتوحة كلّها في النمط المفتوح، ومقفلة في المُقيّد حتى يفتحها
+    // القبلي ثم الاختبارات. وهذا هو منطق provision.js نفسه، فلا يفترقان.
     await c.query(`
-      insert into lesson_progress (tenant_id, enrolment_id, lesson_id)
-      select current_tenant(), $1, l.id
+      insert into lesson_progress (tenant_id, enrolment_id, lesson_id, unlocked_at)
+      select current_tenant(), $1, l.id, case when co.mode = 'open' then now() end
         from lesson l join course co on co.id = l.course_id where co.code = 'COP-101'`, [e[0].id]);
 
     const m = await identity.beginMfaEnrolment(c, u.id, { account: EMAIL });

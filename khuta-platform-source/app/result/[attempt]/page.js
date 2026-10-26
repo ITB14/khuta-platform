@@ -43,6 +43,9 @@ export default async function ResultPage({ params }) {
   const passed = a.passed;                              // null for the pre-assessment
   const retake = passed === false && gate && gate.used < gate.allowed;
   const slug = a.kind === 'lesson' ? `lesson-${a.lesson_no}` : a.kind;
+  // في النمط المفتوح لا معنى لعرض «١٠٠٪» على اختبار يُعاد حتى الإتمام: الرقم
+  // الصادق هو عدد الأسئلة التي أتمّها، لا نسبة لا يمكن أن تقلّ عنها.
+  const openFinal = a.mode === 'open' && a.kind === 'post';
 
   return (
     <>
@@ -55,24 +58,31 @@ export default async function ResultPage({ params }) {
           <Link href="/dashboard">الرئيسية</Link> · {a.course_title}
         </p>
         <h1>
-          نتيجة {a.kind === 'pre' ? 'التقييم القبلي'
-            : a.kind === 'post' ? 'التقييم البعدي' : `اختبار الدرس ${a.lesson_no}`}
+          نتيجة {a.kind === 'pre' ? (a.mode === 'open' ? 'قياس مستواك' : 'التقييم القبلي')
+            : a.kind === 'post' ? (openFinal ? 'اختبار الشهادة' : 'التقييم البعدي')
+            : `اختبار الدرس ${a.lesson_no}`}
         </h1>
         <p className="muted" style={{ marginBottom: 18 }}>
-          المحاولة {a.attempt_no} من {a.max_attempts} · صُحِّحت على الخادم
+          {openFinal ? 'صُحِّح على الخادم سؤالًا سؤالًا'
+            : `المحاولة ${a.attempt_no} من ${a.max_attempts} · صُحِّحت على الخادم`}
         </p>
 
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="score">
-            <span className={`big num${passed === null ? '' : passed ? ' ok' : ' no'}`}
-                  data-testid="score">{pc(score)}</span>
+            <span className={`big num${openFinal ? ' ok' : passed === null ? '' : passed ? ' ok' : ' no'}`}
+                  data-testid="score">{openFinal ? a.total : pc(score)}</span>
             <div>
-              <b>{a.kind === 'pre' ? 'سُجّلت إجاباتك'
+              <b>{openFinal ? 'سؤالًا أتممتها'
+                : a.kind === 'pre' ? 'سُجّلت إجاباتك'
                 : passed ? 'اجتزت' : 'لم تجتز'}</b>
               <p className="tiny">
-                {a.kind === 'pre'
-                  ? 'لا درجة نجاح للتقييم القبلي. تُحفظ هذه النتيجة لتُقارن بالتقييم البعدي.'
-                  : `درجة النجاح ${pc(a.pass_mark)}`}
+                {openFinal
+                  ? 'لا رسوب في هذا الاختبار. أتممت أسئلته كلّها، فصدرت شهادتك.'
+                  : a.kind === 'pre'
+                    ? (a.mode === 'open'
+                        ? 'لا درجة نجاح لهذا القياس ولا يراه أحد كدرجة. يُحفظ لتُقارن به معرفتك بعد الدورة.'
+                        : 'لا درجة نجاح للتقييم القبلي. تُحفظ هذه النتيجة لتُقارن بالتقييم البعدي.')
+                    : `درجة النجاح ${pc(a.pass_mark)}`}
               </p>
             </div>
           </div>
@@ -106,6 +116,13 @@ export default async function ResultPage({ params }) {
           </div>
         ) : null}
 
+        {openFinal && !gain.length ? (
+          <div className="note" style={{ marginBottom: 16 }} data-testid="no-gain">
+            لم تؤدِّ قياس المستوى قبل الدورة، فلا مرجع يُقارَن به — ولذلك لا يظهر لك هنا
+            مكسب تعلّم. وهذا لا ينقص من شهادتك شيئًا.
+          </div>
+        ) : null}
+
         {cert && !cert.revoked_at ? (
           <div className="cert" style={{ marginBottom: 16 }} data-testid="certificate">
             <h3 style={{ marginBottom: 8 }}>صدرت شهادتك</h3>
@@ -124,7 +141,9 @@ export default async function ResultPage({ params }) {
         <div className="card">
           <div className="between">
             <p className="tiny" style={{ flex: 1, minWidth: 240 }}>
-              {a.kind === 'pre' ? 'فُتح الدرس الأول. يبدأ المسار من الرئيسية.'
+              {a.kind === 'pre' ? (a.mode === 'open'
+                  ? 'الدروس مفتوحة كلّها. ابدأ متى شئت من الرئيسية.'
+                  : 'فُتح الدرس الأول. يبدأ المسار من الرئيسية.')
                 : passed && a.kind === 'lesson' ? 'فُتح الدرس التالي.'
                 : passed ? 'اكتمل المسار.'
                 : retake ? 'تستطيع إعادة المحاولة؛ تُحتسب محاولة جديدة.'

@@ -19,7 +19,7 @@ export default async function LessonPage({ params }) {
   const data = await db.withTenant(user.tenant.id, user.id, async (c) => {
     const { rows } = await c.query(`
       select l.id, l.no, l.title_ar, l.start_sec, l.end_sec, l.required_watch_ratio,
-             e.id as enrolment_id, co.title_ar as course_title,
+             e.id as enrolment_id, co.title_ar as course_title, co.mode,
              lp.unlocked_at, lp.completed_at,
              (select json_agg(json_build_object('key', r.storage_key, 'mime', r.mime)
                        order by case r.mime when 'video/mp4' then 0 else 1 end)
@@ -37,7 +37,11 @@ export default async function LessonPage({ params }) {
 
   if (!data) redirect('/dashboard');
 
-  const locked = !data.unlocked_at;
+  // في النمط المفتوح لا بوّابة قبليّة ولا أقفال، فلا تُعرض رسالتاهما — وهما
+  // كانتا تُخفيان المشغّل عن متعلّم لم يؤدِّ قياسًا صار اختياريًّا.
+  const open = data.mode === 'open';
+  const locked = !open && !data.unlocked_at;
+  const gatedByPre = !open && !data.pre_done;
   // Every rendition is signed separately and bound to this viewer. The browser
   // picks the first one it can decode; none of them is a shareable link.
   const sources = locked ? [] : (data.renditions || [])
@@ -59,7 +63,7 @@ export default async function LessonPage({ params }) {
           لا يُحتسب مكتملًا قبل مشاهدة {(Number(data.required_watch_ratio) * 100).toFixed(0)}٪ منه
         </p>
 
-        {!data.pre_done ? (
+        {gatedByPre ? (
           <div className="card"><div className="alert" data-testid="gate-r1">
             لا يُفتح أي درس قبل أداء التقييم القبلي. ابدأ به من الصفحة الرئيسية.
           </div></div>

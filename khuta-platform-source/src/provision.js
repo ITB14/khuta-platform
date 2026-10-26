@@ -70,10 +70,14 @@ async function provisionLearner(c, {
      values (current_tenant(), $1, $2, $3, 'in_progress', now() + ($4 || ' days')::interval)
      returning id`, [u.id, course[0].id, cohort, String(dueDays)]);
 
-  // الحالة الصادقة للبداية: لا شيء مفتوح ولا تقييم قبلي مأخوذ.
+  // الحالة الصادقة للبداية. وفي النمط المفتوح الدروس كلّها مفتوحة من اللحظة
+  // الأولى، فيُسجَّل ذلك هنا لا يُستنتَج في الصفحة.
   await c.query(
-    `insert into lesson_progress (tenant_id, enrolment_id, lesson_id)
-     select current_tenant(), $1, l.id from lesson l where l.course_id = $2`,
+    `insert into lesson_progress (tenant_id, enrolment_id, lesson_id, unlocked_at)
+     select current_tenant(), $1, l.id,
+            case when co.mode = 'open' then now() end
+       from lesson l join course co on co.id = l.course_id
+      where l.course_id = $2`,
     [e[0].id, course[0].id]);
 
   const m = await identity.beginMfaEnrolment(c, u.id, { account: email });

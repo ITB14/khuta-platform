@@ -60,7 +60,19 @@ async function call(path, body, method = 'POST') {
   const mfa = await call('/api/auth/mfa', { code: totp.totp(SECRET) });
   ok(mfa.json?.ok === true, 'جلسة صالحة عبر كلمة المرور ثم الرمز');
 
-  section('ر١ · بوابة التقييم القبلي');
+  // النمط المُقيّد لم يُحذف بل صار إعدادًا. يُختبر أولًا لأن المتعلّم هنا لم
+  // يؤدِّ القبلي بعد، وهي الحالة التي تُظهر البوّابة عاملةً.
+  section('النمط المُقيّد · البوّابة والأقفال كما كانت');
+  // النمط يُختار قبل التسجيل، وحالة الفتح تُزرع بحسبه. فتحويل النمط في
+  // الاختبار يحتاج تصحيح تلك الحالة معه، وإلّا اختُبر نمطٌ على حالة غيره.
+  const setMode = (m) => db.withTenant(t.id, null, async (c) => {
+    await c.query('update course set mode=$1 where code=$2', [m, 'COP-101']);
+    if (m === 'strict') {
+      await c.query('update lesson_progress set unlocked_at=null where enrolment_id=$1',
+        [ctx.enrolment]);
+    }
+  });
+  await setMode('strict');
   let r = await call('/api/course/open', { enrolmentId: ctx.enrolment });
   ok(r.status === 409 && r.json.reason === 'pre_assessment_required',
      'فتح الدورة مرفوض قبل أداء التقييم القبلي');
@@ -68,16 +80,21 @@ async function call(path, body, method = 'POST') {
   ok(r.status === 409 && r.json.reason === 'locked',
      'والدرس الأول نفسه مقفل — لا التفاف على البوابة');
 
-  // submit the pre-assessment (its own screens are the next increment)
-  await db.withTenant(t.id, ctx.user_id, async (c) => {
-    const { rows } = await c.query(
-      `insert into attempt (tenant_id, enrolment_id, assessment_id, attempt_no, submitted_at, score)
-       values (current_tenant(), $1, $2, 1, now(), 0.400) returning id`,
-      [ctx.enrolment, ctx.pre_assessment]);
-    return rows[0];
-  });
+  section('النمط المفتوح · لا بوّابة ولا أقفال');
+  await setMode('open');
   r = await call('/api/course/open', { enrolmentId: ctx.enrolment });
-  ok(r.json?.ok === true, 'وبعد أدائه يُفتح الدرس الأول');
+  ok(r.json?.ok === true && r.json.reason === 'all_unlocked',
+     'الدروس الثمانية تُفتح معًا بلا تقييم قبلي');
+
+  // الفرق الجوهري: الرفض الآن سببه المشاهدة لا القفل. ر٢ باقية وحدها.
+  r = await call(`/api/lesson/${L[0].id}/complete`, { enrolmentId: ctx.enrolment });
+  ok(r.status === 409 && r.json.reason === 'insufficient_coverage',
+     'والرفض سببه نقص المشاهدة لا القفل — ر٢ وحدها بقيت');
+
+  const locked = await db.withTenant(t.id, null, (c) => c.query(
+    `select count(*)::int n from lesson_progress where enrolment_id=$1 and unlocked_at is null`,
+    [ctx.enrolment]));
+  ok(locked.rows[0].n === 0, 'ولا يبقى درس واحد مقفلًا في قاعدة البيانات');
 
   section('ر٢ · النبضات والتغطية');
   const beat = (lesson, pos, seq) =>
@@ -108,14 +125,18 @@ async function call(path, body, method = 'POST') {
   r = await call(`/api/lesson/${L[0].id}/complete`, { enrolmentId: ctx.enrolment });
   ok(r.json?.ok === true, `وبعد اكتمال المشاهدة يُقبل — التغطية ${(r.json.coverage * 100).toFixed(0)}٪`);
 
-  section('ر٣ و ر٤ · التسلسل');
-  // Watching the video finishes the lesson. It does not open the next one:
-  // under R4 that is what passing the lesson quiz does, and only that.
-  ok(r.json?.nextLessonNo === null, 'لكنه لا يفتح الدرس التالي — ذلك لاختبار الدرس');
-  r = await call(`/api/lesson/${L[1].id}/complete`, { enrolmentId: ctx.enrolment });
-  ok(r.status === 409 && r.json.reason === 'locked', 'الدرس الثاني مقفل حتى يُجتاز اختبار الأول');
-  r = await call(`/api/lesson/${L[2].id}/complete`, { enrolmentId: ctx.enrolment });
-  ok(r.status === 409 && r.json.reason === 'locked', 'والثالث كذلك — لا قفز');
+  section('الترتيب حرّ');
+  // الدرس الأخير يُشاهَد ويُتمّ دون المرور بالسبعة قبله. هذا هو التعديل كلّه
+  // في سطر واحد: لا تسلسل مفروض، والمشاهدة وحدها شرط الإتمام.
+  const last = L[L.length - 1];
+  for (let p = 0; p <= last.dur; p += 10) await beat(last, p, 900 + p);
+  r = await call(`/api/lesson/${last.id}/complete`, { enrolmentId: ctx.enrolment });
+  ok(r.json?.ok === true, `الدرس الثامن يُتمّ قبل السابع — التغطية ${(r.json.coverage * 100).toFixed(0)}٪`);
+
+  const doneRows = await db.withTenant(t.id, null, (c) => c.query(
+    `select count(*)::int n from lesson_progress
+      where enrolment_id=$1 and completed_at is not null`, [ctx.enrolment]));
+  ok(doneRows.rows[0].n === 2, 'والمكتمل درسان لا متتاليان — الأول والثامن');
 
   section('الوسائط الموقَّعة');
   const page = await fetch(`${BASE}/lesson/1`, { headers: { cookie: jar } });

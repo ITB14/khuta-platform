@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 async function learnerView(tenantId, userId) {
   return db.withTenant(tenantId, userId, async (c) => {
     const { rows: courses } = await c.query(`
-      select co.id, co.title_ar, e.id as enrolment_id, e.state, e.due_at, e.cohort,
+      select co.id, co.title_ar, co.mode, e.id as enrolment_id, e.state, e.due_at, e.cohort,
              (select count(*) from lesson l where l.course_id = co.id)::int as lessons,
              (select count(*) from lesson_progress lp
                 join lesson l2 on l2.id = lp.lesson_id
@@ -43,7 +43,8 @@ async function learnerView(tenantId, userId) {
     // never invite a learner into a paper the server would refuse to open.
     const { rows: gates } = courses.length ? await c.query(`
       select a.kind, g.ok, g.reason, g.used, g.allowed,
-             (select count(*) from question q where q.assessment_id = a.id)::int as n,
+             (select count(*) from question q
+               where q.assessment_id = a.id and not q.retired)::int as n,
              (select max(at.score) from attempt at
                where at.enrolment_id = $1 and at.assessment_id = a.id and at.submitted_at is not null) as best
         from assessment a cross join lateral assessment_gate($1, a.id) g
@@ -65,6 +66,7 @@ export default async function Dashboard() {
   const { courses, lessons, cert, gates } = await learnerView(user.tenant.id, user.id);
   const c0 = courses[0];
   const live = cert.find((x) => !x.revoked_at);
+  const open = c0?.mode === 'open';
 
   return (
     <>
@@ -94,37 +96,46 @@ export default async function Dashboard() {
                 </span>
               </div>
               <div className="bar"><i style={{ width: `${Math.round((c0.done / c0.lessons) * 100)}%` }} /></div>
-              {!c0.pre_done ? (
+              {!c0.pre_done && gates.pre?.ok ? (
                 <div className="note" style={{ marginTop: 14 }}>
                   <p style={{ marginBottom: 10 }}>
-                    يبدأ المسار بتقييم قبلي قصير. لا درجة نجاح له — يُستخدم لقياس أثر التدريب عليك
-                    بعد إتمام الدورة، ولا يُفتح أي درس قبل أدائه.
+                    {open
+                      ? 'قبل أن تبدأ، تستطيع قياس معرفتك الحالية في دقائق. اختياري تمامًا: لا يفتح شيئًا ولا يقفل شيئًا، ولا يراه أحد كدرجة — فائدته أن تقارن به نفسك بعد الدورة.'
+                      : 'يبدأ المسار بتقييم قبلي قصير. لا درجة نجاح له — يُستخدم لقياس أثر التدريب عليك بعد إتمام الدورة، ولا يُفتح أي درس قبل أدائه.'}
                   </p>
                   <Link className="btn gold" href="/assessment/pre" data-testid="start-pre">
-                    ابدأ التقييم القبلي
+                    {open ? 'اعرف مستواك قبل أن تبدأ' : 'ابدأ التقييم القبلي'}
                   </Link>
+                  {open ? (
+                    <span className="tiny" style={{ marginInlineStart: 12 }}>أو تجاهله وابدأ الدروس مباشرة.</span>
+                  ) : null}
                 </div>
               ) : null}
             </div>
 
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="between" style={{ marginBottom: 10 }}>
-                <h3>التقييم البعدي</h3>
+                <h3>{open ? 'اختبار الشهادة' : 'التقييم البعدي'}</h3>
                 <span className={`pill${gates.post?.ok ? ' gold' : gates.post?.reason === 'already_passed' ? ' ok' : ''}`}>
-                  {gates.post?.reason === 'already_passed' ? 'مجتاز'
+                  {gates.post?.reason === 'already_passed' ? (open ? 'مكتمل' : 'مجتاز')
                     : gates.post?.ok ? 'متاح' : 'مقفل'}
                 </span>
               </div>
               <p className="tiny" style={{ marginBottom: gates.post?.ok ? 12 : 0 }}>
                 {gates.post?.reason === 'already_passed'
-                  ? `اجتزته بدرجة ${Math.round(Number(gates.post.best) * 100)}٪.`
-                  : gates.post?.ok
-                    ? `${gates.post.n} سؤالًا. درجة النجاح ٧٠٪ والمحاولات ${gates.post.used} من ${gates.post.allowed}.`
-                    : `يُفتح بعد إكمال الدروس ${lessons.length} واجتياز اختباراتها. ومعظم أسئلته تُقابل أسئلة التقييم القبلي سؤالًا بسؤال.`}
+                  ? (open ? 'أتممته وصدرت شهادتك.'
+                          : `اجتزته بدرجة ${Math.round(Number(gates.post.best) * 100)}٪.`)
+                  : open
+                    ? (gates.post?.ok
+                        ? `${gates.post.n} سؤالًا، سؤال لكل مهارة. كلّما أخطأت ظهر لك الصواب وشرحه وأعدت السؤال — بلا حدّ للمحاولات.`
+                        : `يُفتح بعد مشاهدة الدروس ${lessons.length} كاملةً. وليس امتحانًا: يُصحّح لك سؤالًا سؤالًا ويشرح الخطأ.`)
+                    : (gates.post?.ok
+                        ? `${gates.post.n} سؤالًا. درجة النجاح ٧٠٪ والمحاولات ${gates.post.used} من ${gates.post.allowed}.`
+                        : `يُفتح بعد إكمال الدروس ${lessons.length} واجتياز اختباراتها. ومعظم أسئلته تُقابل أسئلة التقييم القبلي سؤالًا بسؤال.`)}
               </p>
               {gates.post?.ok ? (
                 <Link className="btn gold" href="/assessment/post" data-testid="start-post">
-                  ابدأ التقييم البعدي
+                  {open ? 'احصل على الشهادة' : 'ابدأ التقييم البعدي'}
                 </Link>
               ) : null}
             </div>
@@ -140,24 +151,27 @@ export default async function Dashboard() {
                       : <b>{l.title_ar}</b>}
                     <span className="tiny">
                       {Math.round(l.secs / 60)} دقائق
-                      {l.quiz_passed ? ' · اختبار الدرس مجتاز'
+                      {open ? ''
+                        : l.quiz_passed ? ' · اختبار الدرس مجتاز'
                         : l.quiz_open ? ` · اختبار الدرس متاح (${l.quiz_used} من ${l.quiz_allowed} محاولات)`
                         : l.done ? ' · استُنفدت محاولات اختبار الدرس' : ''}
                     </span>
                   </div>
-                  {l.quiz_open ? (
+                  {!open && l.quiz_open ? (
                     <Link className="btn gold" href={`/assessment/lesson-${l.no}`}
                           data-testid={`quiz-${l.no}`}>اختبار الدرس</Link>
                   ) : null}
-                  <span className={`pill${l.quiz_passed ? ' ok' : l.done ? ' gold' : ''}`}>
-                    {l.quiz_passed ? 'مجتاز' : l.done ? 'بانتظار الاختبار'
+                  <span className={`pill${open ? (l.done ? ' ok' : '') : l.quiz_passed ? ' ok' : l.done ? ' gold' : ''}`}>
+                    {open ? (l.done ? 'تمّت مشاهدته' : 'متاح')
+                      : l.quiz_passed ? 'مجتاز' : l.done ? 'بانتظار الاختبار'
                       : l.unlocked ? 'متاح' : 'مقفل'}
                   </span>
                 </div>
               ))}
               <p className="tiny" style={{ marginTop: 12 }}>
-                لا يُحتسب الدرس مكتملًا قبل مشاهدة ٩٥٪ منه، ولا يُفتح الدرس التالي قبل اجتياز
-                اختبار سابقه.
+                {open
+                  ? 'الدروس كلّها مفتوحة، شاهدها بالترتيب الذي يناسبك. ولا يُحتسب الدرس مُشاهَدًا قبل ٩٥٪ منه — والحساب يجري على الخادم لا في المتصفّح.'
+                  : 'لا يُحتسب الدرس مكتملًا قبل مشاهدة ٩٥٪ منه، ولا يُفتح الدرس التالي قبل اجتياز اختبار سابقه.'}
               </p>
             </div>
 

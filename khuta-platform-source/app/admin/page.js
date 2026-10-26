@@ -19,7 +19,11 @@ async function roster(tenantId, actorId) {
              exists (select 1 from user_role_grant g2
                       where g2.user_id = u.id and g2.role <> 'learner') as privileged,
              e.id as enrolment_id, e.cohort, e.state, e.due_at,
-             co.title_ar as course_title,
+             co.title_ar as course_title, co.mode,
+             (select f.first_correct_n from first_try_score f
+               where f.enrolment_id = e.id) as first_n,
+             (select f.total_n from first_try_score f
+               where f.enrolment_id = e.id) as first_total,
              (select count(*) from lesson l where l.course_id = co.id)::int as lessons,
              (select count(*) from lesson_progress lp
                 join lesson l2 on l2.id = lp.lesson_id
@@ -90,7 +94,9 @@ export default async function AdminHome() {
           <div><b className="num">{finished}</b><span>أنهوا بشهادة</span></div>
           <div>
             <b className="num">{avgGain === null ? '—' : `${avgGain > 0 ? '+' : ''}${avgGain}٪`}</b>
-            <span>متوسّط مكسب التعلّم</span>
+            {/* العدد مذكور كي لا يُقرأ المتوسّط على أنه متوسّط الجميع: القياس
+                القبلي اختياري، فالمكسب لا يوجد إلا لمن أدّاه. */}
+            <span>متوسّط المكسب ({gains.length} من {rows.length})</span>
           </div>
         </div>
 
@@ -106,7 +112,7 @@ export default async function AdminHome() {
                   <th>الدورة</th>
                   <th>الدروس</th>
                   <th>قبلي</th>
-                  <th>بعدي</th>
+                  <th>الاختبار</th>
                   <th>المكسب</th>
                   <th>الحالة</th>
                   <th>الوصول</th>
@@ -137,7 +143,14 @@ export default async function AdminHome() {
                         {r.enrolment_id ? `${r.done} / ${r.lessons}` : '—'}
                       </td>
                       <td className="num">{pre === null ? '—' : `${pre}٪`}</td>
-                      <td className="num">{post === null ? '—' : `${post}٪`}</td>
+                      {/* في النمط المفتوح يُعاد الاختبار حتى الإتمام، فدرجته
+                          دائمًا ١٠٠٪ ولا تدلّ على شيء. الرقم الدالّ هو ما
+                          أصابه من أول محاولة. */}
+                      <td className="num">
+                        {r.mode === 'open'
+                          ? (r.first_n === null ? '—' : `${r.first_n} / ${r.first_total}`)
+                          : (post === null ? '—' : `${post}٪`)}
+                      </td>
                       <td className={`num ${gain > 0 ? 'up' : 'flat'}`}>
                         {gain === null ? '—' : `${gain > 0 ? '+' : ''}${gain}٪`}
                       </td>
@@ -175,8 +188,11 @@ export default async function AdminHome() {
         </div>
 
         <p className="tiny muted" style={{ marginTop: 14 }}>
-          المكسب هو فرق التقييم البعدي عن القبلي لمن أدّى الاثنين. ولا يظهر هنا إلا
-          متعلّمو جهتك — العزل تفرضه قاعدة البيانات لا هذه الصفحة.
+          «الاختبار» في الدورات المفتوحة هو ما أصابه المتعلّم من أول محاولة قبل أن
+          يُكشف له الصواب — مؤشّر للإدارة لا درجة نجاح، ولا يراه المتعلّم ولا يمنع
+          شهادته. و«المكسب» فرق البعدي عن القبلي، ولا يظهر إلا لمن أدّى القياس
+          القبلي الاختياري. ولا يظهر هنا إلا متعلّمو جهتك — العزل تفرضه قاعدة
+          البيانات لا هذه الصفحة.
         </p>
       </main>
     </>

@@ -40,6 +40,10 @@ export async function GET() {
                 join assessment s on s.id = a.assessment_id
                where a.enrolment_id = e.id and s.kind = 'post'
                  and a.submitted_at is not null) as post_score,
+             (select f.first_correct_n from first_try_score f
+               where f.enrolment_id = e.id) as first_n,
+             (select f.total_n from first_try_score f
+               where f.enrolment_id = e.id) as first_total,
              (select ct.serial from certificate ct
                where ct.enrolment_id = e.id and ct.revoked_at is null
                order by ct.issued_at desc limit 1) as cert_serial,
@@ -57,7 +61,9 @@ export async function GET() {
   const head = ['الاسم', 'البريد', 'الرقم الوظيفي', 'الإدارة', 'المسمّى الوظيفي',
                 'حالة الحساب', 'الدورة', 'الدفعة', 'الموعد النهائي',
                 'الدروس المكتملة', 'عدد الدروس', 'التقييم القبلي ٪',
-                'التقييم البعدي ٪', 'مكسب التعلّم ٪', 'رقم الشهادة', 'تاريخ الإصدار'];
+                'التقييم البعدي ٪', 'مكسب التعلّم ٪',
+                'أصاب من أول محاولة', 'أسئلة الاختبار',
+                'رقم الشهادة', 'تاريخ الإصدار'];
 
   const day = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '');
 
@@ -71,6 +77,7 @@ export async function GET() {
       r.course_title, r.cohort, day(r.due_at),
       r.enrolment_id === null ? '' : r.done, r.course_title ? r.lessons : '',
       pre, post, pre !== '' && post !== '' ? post - pre : '',
+      r.first_n === null ? '' : r.first_n, r.first_total === null ? '' : r.first_total,
       r.cert_serial, day(r.cert_at),
     ].map(cell).join(','));
   }

@@ -15,9 +15,10 @@ async function findAssessment(c, userId, slug) {
   if (!s) return null;
   const { rows } = await c.query(`
     select a.id as assessment_id, a.kind, a.pass_mark, a.max_attempts,
-           e.id as enrolment_id, co.title_ar as course_title,
+           e.id as enrolment_id, co.title_ar as course_title, co.mode,
            l.no as lesson_no, l.title_ar as lesson_title,
-           (select count(*) from question q where q.assessment_id = a.id)::int as total,
+           (select count(*) from question q
+             where q.assessment_id = a.id and not q.retired)::int as total,
            g.ok, g.reason, g.used, g.allowed
       from enrolment e
       join course co on co.id = e.course_id
@@ -34,8 +35,9 @@ async function ownedAttempt(c, userId, attemptId) {
   const { rows } = await c.query(`
     select a.id, a.submitted_at, a.attempt_no, a.score, a.passed,
            s.kind, s.pass_mark, s.max_attempts, e.id as enrolment_id,
-           co.title_ar as course_title, l.no as lesson_no,
-           (select count(*) from question q where q.assessment_id = s.id)::int as total
+           co.title_ar as course_title, co.mode, l.no as lesson_no,
+           (select count(*) from question q
+             where q.assessment_id = s.id and not q.retired)::int as total
       from attempt a
       join enrolment e on e.id = a.enrolment_id
       join assessment s on s.id = a.assessment_id
@@ -54,7 +56,10 @@ async function paper(c, attemptId) {
   for (const r of rows) {
     let q = byId.get(r.question_id);
     if (!q) {
-      q = { id: r.question_id, externalId: r.external_id, stem: r.stem_ar, options: [], chosen: null };
+      // resolved و tries و explain للنمط المفتوح: الصفحة تستأنف من حيث وقف
+      // المتعلّم، فلا يُسأل عمّا أصابه ولا يفقد شرحًا رآه.
+      q = { id: r.question_id, externalId: r.external_id, stem: r.stem_ar, options: [],
+            chosen: null, resolved: r.resolved, tries: r.tries, explain: r.explain_ar };
       byId.set(r.question_id, q); out.push(q);
     }
     q.options.push({ id: r.option_id, label: r.label, text: r.text_ar });
@@ -68,8 +73,9 @@ const REASONS = {
   already_passed: 'سبق أن اجتزت هذا التقييم.',
   already_submitted: 'سبق أن أدّيت هذا التقييم.',
   lesson_not_complete: 'يُفتح اختبار الدرس بعد مشاهدة ٩٥٪ منه.',
-  lessons_outstanding: 'يُفتح التقييم البعدي بعد إكمال الدروس الخمسة واجتياز اختباراتها.',
+  lessons_outstanding: 'يُفتح بعد إتمام مشاهدة دروس الدورة كلّها.',
   no_attempts_left: 'استُنفدت المحاولات المسموح بها لهذا التقييم.',
+  not_used_in_open_mode: 'لا اختبار لهذا الدرس في هذه الدورة.',
 };
 
 module.exports = { parseSlug, findAssessment, ownedAttempt, paper, REASONS, db };
