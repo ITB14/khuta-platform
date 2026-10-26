@@ -126,6 +126,18 @@ export default function FinalQuiz({ slug, total }) {
         </div>
       ) : null}
 
+      {/* استئناف بعد إتمام الأسئلة كلّها وقبل الإنهاء: لولا هذا لعاد المتعلّم
+          إلى سؤال أتمّه، بخياراته معطّلة وبلا زرّ — طريق مسدود لا مخرج منه. */}
+      {!fb && allResolved ? (
+        <div className="note ok" data-testid="resume-finish">
+          <p style={{ marginBottom: 10 }}><strong>أتممت الأسئلة كلّها.</strong></p>
+          <button className="btn gold" onClick={finish}
+                  disabled={phase === 'sending'} data-testid="next">
+            أنهِ واحصل على الشهادة
+          </button>
+        </div>
+      ) : null}
+
       {fb && fb.correct ? (
         <div className="note ok" data-testid="correct">
           <p style={{ marginBottom: 10 }}><strong>إجابة صحيحة.</strong></p>

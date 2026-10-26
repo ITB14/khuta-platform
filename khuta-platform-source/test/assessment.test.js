@@ -163,6 +163,12 @@ async function call(path, body, method = 'POST') {
   }
   ok(last.remaining === 0 && last.allDone === true, 'وبإتمام الباقي لا يبقى سؤال');
 
+  // الاستئناف بعد إتمام الأسئلة وقبل التسليم: الورقة تعود وكلّ سؤال فيها
+  // محلول، وهي الحالة التي كانت تترك المتعلّم في طريق مسدود.
+  const resumed = (await call('/api/assessment/start', { slug: 'post' })).json;
+  ok(resumed.ok && resumed.resumed === true && resumed.questions.every((q) => q.resolved),
+     'ومحاولة مُتمّة لم تُسلَّم تُستأنف بكل أسئلتها محلولة');
+
   const postRes = (await call(`/api/attempt/${post.attemptId}/submit`)).json;
   ok(postRes.passed === true && postRes.score === 1,
      `يُسلَّم مكتملًا — ${postRes.correct} من ${postRes.total}`);
