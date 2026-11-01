@@ -251,6 +251,32 @@ async function call(path, body, method = 'POST') {
   ok(issued.gain === 0, 'ولا مكسب تعلّم له — لا مرجع يُقارَن به، وهذا كل ما فقده');
 
   // ------------------------------------------------------------------------
+  section('الإشعارات داخل المنصة');
+  const inbox = await call('/notifications', undefined, 'GET');
+  ok(inbox.status === 200 && /صدرت شهادتك/.test(inbox.text),
+     'الشهادة كتبت إشعارها عند إصدارها لا عند قراءته');
+  ok(/لا تُرسَل بريدًا/.test(inbox.text),
+     'والصفحة تقول صراحةً إنها لا تُرسَل بريدًا — لا SMTP في المنصة');
+
+  // الاشتقاق يُنادى عند كل فتح؛ قيد التفرّد هو ما يمنعه من أن يصير طوفانًا.
+  const beforeN = await db.withTenant(t.id, null, (c) => c.query(
+    `select count(*)::int n from notification where enrolment_id = $1`, [ctx.enrolment]));
+  await call('/notifications', undefined, 'GET');
+  await call('/notifications', undefined, 'GET');
+  const afterN = await db.withTenant(t.id, null, (c) => c.query(
+    `select count(*)::int n from notification where enrolment_id = $1`, [ctx.enrolment]));
+  ok(beforeN.rows[0].n === afterN.rows[0].n,
+     `وفتحُها ثلاث مرّات لا يكرّر إشعارًا — ${afterN.rows[0].n} كما هي`);
+
+  const marked = await call('/api/notifications/read');
+  ok(marked.json?.ok && marked.json.marked >= 1, 'وتُعلَّم مقروءةً دفعةً واحدة');
+  const stillUnread = await db.withTenant(t.id, null, (c) => c.query(
+    `select count(*)::int n from notification n
+      join app_user u on u.id = n.user_id
+     where lower(u.email) = lower($1) and n.read_at is null`, [EMAIL]));
+  ok(stillUnread.rows[0].n === 0, 'فلا يبقى غير مقروء لصاحبها');
+
+  // ------------------------------------------------------------------------
   section('محاولات الالتفاف');
   r = await call(`/api/attempt/${post.attemptId}/answer`,
     { questionId: q0.id, optionId: right0.id });

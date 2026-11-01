@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { GovStrip, PlatformBar, DemoBanner } from '../../components/Chrome';
 import Link from 'next/link';
 import SignOutButton from './SignOutButton';
+import NotificationBell from '../../components/NotificationBell';
 const db = require('../../src/db');
 const S = require('../../lib/session');
 const A = require('../../lib/authz');
@@ -55,7 +56,14 @@ async function learnerView(tenantId, userId) {
       select serial, verify_code, issued_at, revoked_at from certificate
        where enrolment_id = any($1::uuid[])`, [courses.map((x) => x.enrolment_id)]);
 
-    return { courses, lessons, cert, gates: Object.fromEntries(gates.map((g) => [g.kind, g])) };
+    // الحالة تُترجَم إلى إشعار عند النظر، إذ لا مُجدوِل يمرّ كل ليلة.
+    await c.query('select refresh_due_notifications($1)', [userId]);
+    const { rows: un } = await c.query(
+      `select count(*)::int n from notification where user_id = $1 and read_at is null`,
+      [userId]);
+
+    return { courses, lessons, cert, unread: un[0].n,
+             gates: Object.fromEntries(gates.map((g) => [g.kind, g])) };
   });
 }
 
@@ -63,7 +71,7 @@ export default async function Dashboard() {
   const user = await S.currentUser();
   if (!user) redirect('/signin');
   if (A.learnerDenial(user) === 'change-password') redirect('/account/password');
-  const { courses, lessons, cert, gates } = await learnerView(user.tenant.id, user.id);
+  const { courses, lessons, cert, gates, unread } = await learnerView(user.tenant.id, user.id);
   const c0 = courses[0];
   const live = cert.find((x) => !x.revoked_at);
   const open = c0?.mode === 'open';
@@ -76,6 +84,7 @@ export default async function Dashboard() {
         {A.isAdmin(user) ? (
           <Link className="linkbtn" href="/admin" data-testid="to-admin">المتعلّمون</Link>
         ) : null}
+        <NotificationBell count={unread} />
         <Link className="linkbtn" href="/account/password" data-testid="to-password">كلمة المرور</Link>
         <SignOutButton />
       </PlatformBar>
