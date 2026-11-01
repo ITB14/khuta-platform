@@ -342,6 +342,81 @@ async function signIn(call, email, password, secret) {
   ok(prog.rows.some((r) => r.name === 'بلا إدارة') || totalRows > 0,
      'ومن لا إدارة له له صفّه هو — لا يختفي من التقرير');
 
+  // ---------------------------------------------- المهارات والطلب عليها
+  section('المهارات والطلب على التعلّم');
+  for (const [n, cat] of [['Excel المتقدّم', 'أدوات مكتبية'],
+                          ['تحليل البيانات', 'تحليل'],
+                          ['إدارة المشاريع', 'إدارة']]) {
+    const r = await admin('/api/admin/skills', { method: 'POST', body: { nameAr: n, category: cat } });
+    if (!r.json?.ok && r.status !== 409) ok(false, `تعذّر إنشاء ${n}: ${r.json?.error}`);
+  }
+  ok(true, 'ثلاث مهارات في الكتالوج');
+
+  const dupSkill = await admin('/api/admin/skills', {
+    method: 'POST', body: { nameAr: ' Excel المتقدّم ' },
+  });
+  ok(dupSkill.status === 409, 'واسم مكرّر يُردّ — الكتالوج مُعرَّف لا حرّ');
+
+  // الموظف يعلن لنفسه. و`back` خرج من إعادة التعيين بكلمة مؤقّتة، وبوّابة
+  // تغييرها تحجب مسارات المتعلّم كلّها — ومنها هذه. فيغيّرها أولًا كما يفعل.
+  const SKILLS_PW = 'Maharati!Khuta2027';
+  const pwForSkills = await back('/api/account/password', {
+    method: 'POST', body: { currentPassword: reset.json.password, newPassword: SKILLS_PW },
+  });
+  ok(pwForSkills.status === 200, 'المتعلّم غيّر كلمته المؤقّتة قبل أن يُعلن عن مهاراته');
+
+  const skillList = (await admin('/api/admin/skills')).json.skills;
+  const excel = skillList.find((s) => s.name_ar === 'Excel المتقدّم');
+  const pm = skillList.find((s) => s.name_ar === 'إدارة المشاريع');
+
+  const declared = await back('/api/profile/skills', {
+    method: 'POST', body: { skillId: excel.skill_id, stance: 'wants' },
+  });
+  ok(declared.json?.ok, 'والمتعلّم يعلن عن مهارة يريد تعلّمها');
+
+  await back('/api/profile/skills', { method: 'POST', body: { skillId: pm.skill_id, stance: 'has' } });
+
+  const bogus = await back('/api/profile/skills', {
+    method: 'POST', body: { skillId: excel.skill_id, stance: 'expert' },
+  });
+  ok(bogus.status === 400, 'وحالة غير معروفة تُرفض');
+
+  const skillsAfter = (await admin('/api/admin/skills')).json.skills;
+  const excelAfter = skillsAfter.find((s) => s.skill_id === excel.skill_id);
+  ok(excelAfter.wants === 1 && excelAfter.has === 0,
+     'والطلب يُحتسب في اللوحة — واحد يريد تعلّمها');
+  ok(skillsAfter[0].skill_id === excel.skill_id,
+     'والترتيب بالطلب: المطلوبة أعلى الصفحة لا أسفلها');
+
+  // تغيير الرأي يُحدِّث ولا يُضاعف — القيد على (الموظف، المهارة).
+  await back('/api/profile/skills', { method: 'POST', body: { skillId: excel.skill_id, stance: 'learning' } });
+  const moved = (await admin('/api/admin/skills')).json.skills
+    .find((s) => s.skill_id === excel.skill_id);
+  ok(moved.wants === 0 && moved.learning === 1 && moved.declared === 1,
+     'وتغيير الحالة ينقل الإعلان ولا يُضاعفه');
+
+  // السحب
+  await back('/api/profile/skills', { method: 'POST', body: { skillId: excel.skill_id, stance: null } });
+  const pulled = (await admin('/api/admin/skills')).json.skills
+    .find((s) => s.skill_id === excel.skill_id);
+  ok(pulled.declared === 0, 'وسحبُه يمحو الإعلان');
+
+  // التعطيل يمنع الإضافة الجديدة ولا يمحو ما أُعلن
+  await admin(`/api/admin/skills/${pm.skill_id}`, { method: 'PATCH', body: { isActive: false } });
+  const onRetired = await back('/api/profile/skills', {
+    method: 'POST', body: { skillId: pm.skill_id, stance: 'wants' },
+  });
+  ok(onRetired.status === 400, 'ومهارة معطّلة لا تُضاف من جديد');
+  const kept = (await admin('/api/admin/skills')).json.skills
+    .find((s) => s.skill_id === pm.skill_id);
+  ok(kept.has === 1, 'ومن أعلنها قبل التعطيل يبقى إعلانه — التعطيل ليس حذفًا');
+  await admin(`/api/admin/skills/${pm.skill_id}`, { method: 'PATCH', body: { isActive: true } });
+
+  const skillDenied = await back('/api/admin/skills', {
+    method: 'POST', body: { nameAr: 'مهارة متسلّلة' },
+  });
+  ok(skillDenied.status === 403, 'ومتعلّم لا يضيف إلى الكتالوج');
+
   section('استيراد دفعة من ملف');
   const BULK_A = `bulk1+${Date.now()}@alain.example`;
   const BULK_B = `bulk2+${Date.now()}@alain.example`;
