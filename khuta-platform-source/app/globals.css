@@ -144,6 +144,10 @@ button,input{font-family:inherit;font-size:inherit}
 .gain th,.gain td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:start}
 .gain th{font-size:12.5px;color:var(--ink-2);font-weight:600}
 .gain .up{color:var(--ok);font-weight:700} .gain .flat{color:var(--ink-3)}
+/* المتأخّر هو سبب وجود العمود، فلا يُكتب بلون الباقي. وكان الصنف مُستعملًا
+   في الجدول واللوحة بلا تعريف فيهما، فيظهر الرقم أسود كأن شيئًا لم يكن. */
+.gain .no{color:var(--err);font-weight:700}
+.kpi b.no{color:var(--err)}
 .cert{border:1px solid var(--gold);border-radius:var(--r);padding:22px;background:var(--gold-bg)}
 .cert .serial{font-family:var(--font);font-weight:700;font-size:20px;direction:ltr;display:inline-block}
 .cert .code{letter-spacing:.18em;font-weight:700;direction:ltr;display:inline-block}

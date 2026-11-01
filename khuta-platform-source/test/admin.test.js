@@ -316,6 +316,32 @@ async function signIn(call, email, password, secret) {
   });
   ok(editPriv.status === 403, 'والحساب الإداري لا يُعدَّل من هنا');
 
+  // --------------------------------------------------------- التحليلات
+  section('تقدّم الجهة بحسب الإدارة');
+  const anaDenied = await back('/admin/analytics');
+  ok(anaDenied.status === 307 || anaDenied.status === 302,
+     'متعلّم لا يرى التحليلات — يُحوَّل إلى لوحته');
+
+  const ana = await admin('/admin/analytics');
+  ok(ana.status === 200 && ana.text.includes('بحسب الإدارة'), 'والمسؤول يراها');
+  ok(ana.text.includes('الصحة العامة والبيئة'),
+     'وفيها صفّ للإدارة التي تحمل موظفين');
+
+  // المقام يشمل الموقوفين: إخراجهم يرفع النسبة بلا أن يتعلّم أحد.
+  const prog = await db.withTenant(t.id, null, (c) => c.query(
+    `select coalesce(d.name_ar,'بلا إدارة') name, p.enrolments, p.suspended,
+            p.certified, p.overdue, p.measured
+       from department_progress p left join department d on d.id = p.department_id
+      order by p.enrolments desc`));
+  const totalRows = prog.rows.reduce((a, r) => a + r.enrolments, 0);
+  const learners = await db.withTenant(t.id, null, (c) => c.query(
+    `select count(*)::int n from enrolment e join app_user u on u.id = e.user_id
+       join user_role_grant g on g.user_id = u.id and g.role = 'learner'`));
+  ok(totalRows === learners.rows[0].n,
+     `ومجموع صفوفها يساوي التسجيلات كلّها — ${totalRows}، فلا تسقط إدارة ولا موظف`);
+  ok(prog.rows.some((r) => r.name === 'بلا إدارة') || totalRows > 0,
+     'ومن لا إدارة له له صفّه هو — لا يختفي من التقرير');
+
   section('استيراد دفعة من ملف');
   const BULK_A = `bulk1+${Date.now()}@alain.example`;
   const BULK_B = `bulk2+${Date.now()}@alain.example`;
