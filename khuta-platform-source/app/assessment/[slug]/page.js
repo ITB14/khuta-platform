@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { GovStrip, PlatformBar, DemoBanner } from '../../../components/Chrome';
+import Back from '../../../components/Back';
 import SignOutButton from '../../dashboard/SignOutButton';
 import Quiz from './Quiz';
 import FinalQuiz from './FinalQuiz';
@@ -57,9 +58,7 @@ export default async function AssessmentPage({ params }) {
       <PlatformBar user={user}><SignOutButton /></PlatformBar>
 
       <main className="wrap">
-        <p className="tiny" style={{ marginBottom: 6 }}>
-          <Link href="/dashboard">الرئيسية</Link> · {a.course_title}
-        </p>
+        <Back href="/dashboard" label="الرئيسية" here={a.course_title} />
         <h1>{title}</h1>
         <p className="muted" style={{ marginBottom: 18, maxWidth: 760 }}>{head.lead(a.total)}</p>
 

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { GovStrip, PlatformBar, DemoBanner } from '../../../components/Chrome';
+import Back from '../../../components/Back';
 import SignOutButton from '../../dashboard/SignOutButton';
 import SkillsEditor from './SkillsEditor';
 const db = require('../../../src/db');
@@ -41,9 +41,7 @@ export default async function AdminSkills() {
       <PlatformBar user={user}><SignOutButton /></PlatformBar>
 
       <main className="wrap" style={{ maxWidth: 1040 }}>
-        <p className="tiny muted" style={{ marginBottom: 4 }}>
-          <Link href="/admin">المتعلّمون</Link> · المهارات والطلب
-        </p>
+        <Back href="/admin" label="المتعلّمون" here="المهارات والطلب" />
         <h1>المهارات والطلب على التعلّم</h1>
         <p className="muted" style={{ marginBottom: 20, maxWidth: 800 }}>
           المنصة تحمل دورة واحدة وأربعًا موعودة، والسؤال الذي يسبق تصويرها:

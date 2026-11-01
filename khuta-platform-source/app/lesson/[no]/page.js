@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { GovStrip, PlatformBar, DemoBanner } from '../../../components/Chrome';
+import Back from '../../../components/Back';
 import SignOutButton from '../../dashboard/SignOutButton';
 import Player from './Player';
 const db = require('../../../src/db');
@@ -54,9 +54,7 @@ export default async function LessonPage({ params }) {
       <PlatformBar user={user}><SignOutButton /></PlatformBar>
 
       <main className="wrap">
-        <p className="tiny" style={{ marginBottom: 6 }}>
-          <Link href="/dashboard">الرئيسية</Link> · {data.course_title}
-        </p>
+        <Back href="/dashboard" label="الرئيسية" here={data.course_title} />
         <h1>الدرس {data.no} — {data.title_ar}</h1>
         <p className="muted" style={{ marginBottom: 18 }}>
           المدّة {Math.round((data.end_sec - data.start_sec) / 60)} دقائق ·

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import Mark from './Mark';
 import Wordmark from './Wordmark';
 
@@ -19,14 +20,22 @@ export function GovStrip() {
   );
 }
 
-export function PlatformBar({ user, children }) {
+// الكلمة-علامة مخرجٌ من أي صفحة إلى الرئيسية. و`home` يُمرَّر null حيث
+// يكون الخروج ممنوعًا أصلًا — كصفحة كلمة المرور المؤقّتة التي تُعيد إليها
+// الرئيسيةُ نفسها، فرابطٌ إليها يبدو معطّلًا وهو ليس كذلك.
+export function PlatformBar({ user, children, home = '/dashboard' }) {
+  const lockup = (
+    <>
+      <Mark />
+      <Wordmark />
+      <small>KHUTA · أكاديمية بلدية مدينة العين</small>
+    </>
+  );
   return (
     <>
       <div className="pbar">
         <div className="brand">
-          <Mark />
-          <Wordmark />
-          <small>KHUTA · أكاديمية بلدية مدينة العين</small>
+          {user && home ? <Link href={home} data-testid="brand-home">{lockup}</Link> : lockup}
         </div>
         <div className="util">
           {user ? <span className="who">{user.full_name_ar}</span> : null}

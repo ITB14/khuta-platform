@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation';
-import Link from 'next/link';
 import { GovStrip, PlatformBar, DemoBanner } from '../../../../components/Chrome';
+import Back from '../../../../components/Back';
 import SignOutButton from '../../../dashboard/SignOutButton';
 import EditLearnerForm from './EditLearnerForm';
 const db = require('../../../../src/db');
@@ -53,9 +53,7 @@ export default async function EditLearner({ params }) {
       <PlatformBar user={user}><SignOutButton /></PlatformBar>
 
       <main className="wrap" style={{ maxWidth: 820 }}>
-        <p className="tiny muted" style={{ marginBottom: 4 }}>
-          <Link href="/admin">المتعلّمون</Link> · {learner.full_name_ar}
-        </p>
+        <Back href="/admin" label="المتعلّمون" here={learner.full_name_ar} />
         <h1>{learner.full_name_ar}</h1>
         <p className="muted ltr" style={{ marginBottom: 20 }}>{learner.email}</p>
 

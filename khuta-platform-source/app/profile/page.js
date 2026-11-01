@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { GovStrip, PlatformBar, DemoBanner } from '../../components/Chrome';
+import Back from '../../components/Back';
 import SignOutButton from '../dashboard/SignOutButton';
 import SkillsPicker from './SkillsPicker';
 const db = require('../../src/db');
@@ -35,9 +35,7 @@ export default async function Profile() {
       <PlatformBar user={user}><SignOutButton /></PlatformBar>
 
       <main className="wrap" style={{ maxWidth: 860 }}>
-        <p className="tiny muted" style={{ marginBottom: 4 }}>
-          <Link href="/dashboard">الرئيسية</Link> · ملفّي
-        </p>
+        <Back href="/dashboard" label="الرئيسية" here="ملفّي" />
         <h1>{user.full_name_ar}</h1>
         <p className="muted" style={{ marginBottom: 20, maxWidth: 740 }}>
           {[me.job_title, me.department, me.employee_no].filter(Boolean).join(' · ')}

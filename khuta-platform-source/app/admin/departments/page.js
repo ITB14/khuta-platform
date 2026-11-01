@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { GovStrip, PlatformBar, DemoBanner } from '../../../components/Chrome';
+import Back from '../../../components/Back';
 import SignOutButton from '../../dashboard/SignOutButton';
 import DepartmentsEditor from './DepartmentsEditor';
 const db = require('../../../src/db');
@@ -33,9 +33,7 @@ export default async function DepartmentsPage() {
       <PlatformBar user={user}><SignOutButton /></PlatformBar>
 
       <main className="wrap" style={{ maxWidth: 1000 }}>
-        <p className="tiny muted" style={{ marginBottom: 4 }}>
-          <Link href="/admin">المتعلّمون</Link> · الإدارات
-        </p>
+        <Back href="/admin" label="المتعلّمون" here="الإدارات" />
         <h1>إدارات {user.tenant.name_ar}</h1>
         <p className="muted" style={{ marginBottom: 20, maxWidth: 760 }}>
           كانت الإدارة حقلًا يُكتب باليد لكل موظف، فتعدّدت كتابةُ الإدارة الواحدة

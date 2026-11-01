@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation';
-import Link from 'next/link';
 import { GovStrip, PlatformBar } from '../../../components/Chrome';
+import Back from '../../../components/Back';
 import SignOutButton from '../../dashboard/SignOutButton';
 import PrintButton from './PrintButton';
 const db = require('../../../src/db');
@@ -54,9 +54,7 @@ export default async function CertificatePage({ params }) {
 
       <main className="wrap" style={{ maxWidth: 900 }}>
         <div className="between noprint" style={{ marginBottom: 16 }}>
-          <p className="tiny muted" style={{ margin: 0 }}>
-            <Link href="/dashboard">لوحتي</Link> · الشهادة
-          </p>
+          <Back href="/dashboard" label="الرئيسية" here="الشهادة" />
           <PrintButton />
         </div>
 

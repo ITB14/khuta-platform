@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { GovStrip, PlatformBar, DemoBanner } from '../../../components/Chrome';
+import Back from '../../../components/Back';
 import SignOutButton from '../../dashboard/SignOutButton';
 const db = require('../../../src/db');
 const S = require('../../../lib/session');
@@ -46,9 +46,7 @@ export default async function Analytics() {
       <PlatformBar user={user}><SignOutButton /></PlatformBar>
 
       <main className="wrap" style={{ maxWidth: 1060 }}>
-        <p className="tiny muted" style={{ marginBottom: 4 }}>
-          <Link href="/admin">المتعلّمون</Link> · التحليلات
-        </p>
+        <Back href="/admin" label="المتعلّمون" here="التحليلات" />
         <div className="between" style={{ marginBottom: 6 }}>
           <h1>تقدّم {user.tenant.name_ar} بحسب الإدارة</h1>
           <a className="linkbtn" href="/api/admin/export">تصدير CSV</a>

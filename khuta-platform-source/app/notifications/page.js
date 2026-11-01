@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { GovStrip, PlatformBar, DemoBanner } from '../../components/Chrome';
+import Back from '../../components/Back';
 import SignOutButton from '../dashboard/SignOutButton';
 import MarkAllRead from './MarkAllRead';
 const db = require('../../src/db');
@@ -53,9 +54,7 @@ export default async function Notifications() {
       <PlatformBar user={user}><SignOutButton /></PlatformBar>
 
       <main className="wrap" style={{ maxWidth: 820 }}>
-        <p className="tiny muted" style={{ marginBottom: 4 }}>
-          <Link href="/dashboard">الرئيسية</Link> · الإشعارات
-        </p>
+        <Back href="/dashboard" label="الرئيسية" here="الإشعارات" />
         <div className="between" style={{ marginBottom: 6 }}>
           <h1>الإشعارات</h1>
           {unread > 0 ? <MarkAllRead /> : null}

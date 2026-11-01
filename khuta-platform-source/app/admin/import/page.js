@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { GovStrip, PlatformBar, DemoBanner } from '../../../components/Chrome';
+import Back from '../../../components/Back';
 import SignOutButton from '../../dashboard/SignOutButton';
 import ImportForm from './ImportForm';
 const db = require('../../../src/db');
@@ -27,9 +27,7 @@ export default async function ImportLearners() {
       <PlatformBar user={user}><SignOutButton /></PlatformBar>
 
       <main className="wrap" style={{ maxWidth: 900 }}>
-        <p className="tiny muted" style={{ marginBottom: 4 }}>
-          <Link href="/admin">المتعلّمون</Link> · استيراد دفعة
-        </p>
+        <Back href="/admin" label="المتعلّمون" here="استيراد دفعة" />
         <h1>استيراد دفعة من ملف</h1>
         <p className="muted" style={{ marginBottom: 20 }}>
           كل صفّ متعلّم. ما ينجح يُنشأ وما يفشل يُذكر بسطره وسببه — صفّ خاطئ

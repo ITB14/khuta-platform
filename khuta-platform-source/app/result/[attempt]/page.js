@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { GovStrip, PlatformBar, DemoBanner } from '../../../components/Chrome';
+import Back from '../../../components/Back';
 import SignOutButton from '../../dashboard/SignOutButton';
 const S = require('../../../lib/session');
 const AZ = require('../../../lib/authz');
@@ -54,9 +55,7 @@ export default async function ResultPage({ params }) {
       <PlatformBar user={user}><SignOutButton /></PlatformBar>
 
       <main className="wrap">
-        <p className="tiny" style={{ marginBottom: 6 }}>
-          <Link href="/dashboard">الرئيسية</Link> · {a.course_title}
-        </p>
+        <Back href="/dashboard" label="الرئيسية" here={a.course_title} />
         <h1>
           نتيجة {a.kind === 'pre' ? (a.mode === 'open' ? 'قياس مستواك' : 'التقييم القبلي')
             : a.kind === 'post' ? (openFinal ? 'اختبار الشهادة' : 'التقييم البعدي')

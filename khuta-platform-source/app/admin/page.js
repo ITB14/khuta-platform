@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { GovStrip, PlatformBar, DemoBanner } from '../../components/Chrome';
+import Back from '../../components/Back';
 import SignOutButton from '../dashboard/SignOutButton';
 import RowActions from './RowActions';
 const db = require('../../src/db');
@@ -76,6 +77,8 @@ export default async function AdminHome() {
       <PlatformBar user={user}><SignOutButton /></PlatformBar>
 
       <main className="wrap">
+        {/* المسؤول متعلّمٌ أيضًا، ولم يكن له من هنا طريقٌ إلى دوراته هو. */}
+        <Back href="/dashboard" label="الرئيسية" here="المتعلّمون" />
         <div className="between" style={{ marginBottom: 6 }}>
           <h1>المتعلّمون</h1>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
