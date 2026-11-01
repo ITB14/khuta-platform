@@ -1,3 +1,5 @@
+import { headers } from 'next/headers';
+import { createHash } from 'node:crypto';
 import { GovStrip } from '../../components/Chrome';
 const db = require('../../src/db');
 
@@ -10,7 +12,24 @@ export default async function VerifyPage({ searchParams }) {
   const { code } = await searchParams;
   let r = null;
   if (code) {
-    const { rows } = await db.pool.query('select * from verify_certificate($1)', [String(code)]);
+    // الجهة من اسم المضيف لا من جلسة — الصفحة عامّة بلا جلسة. وتُمرَّر للتسجيل
+    // وحده: رمزٌ لا يُطابق شيئًا يُنسَب إلى الجهة التي سُئلت فيه، لا إلى جهة
+    // يختارها الرمز نفسه.
+    const h = await headers();
+    const host = h.get('x-forwarded-host') || h.get('host') || '';
+    const t = await db.resolveTenant(host, process.env.KHUTA_DEFAULT_TENANT || 'alain')
+      .catch(() => null);
+
+    // بصمةٌ لا عنوان: تكفي لتمييز المتكرّر ولا تُعرّف شخصًا، ولا تُردّ إلى
+    // عنوان بلا الملح الذي يُولَّد لهذه المنصة.
+    const salt = process.env.KHUTA_VERIFY_SALT || 'khuta';
+    const ip = h.get('x-forwarded-for')?.split(',')[0]?.trim() || '';
+    const hash = ip
+      ? createHash('sha256').update(salt + '|' + ip).digest('hex').slice(0, 32)
+      : null;
+
+    const { rows } = await db.pool.query('select * from verify_certificate($1,$2,$3)',
+      [String(code), t?.id || null, hash]);
     r = rows[0] || { found: false };
   }
 

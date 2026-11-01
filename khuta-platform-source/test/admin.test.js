@@ -494,6 +494,125 @@ async function signIn(call, email, password, secret) {
   ok(catPage.status === 200 && catPage.text.includes('أدوات العمل الرقمية'),
      'وصفحة الكتالوج تعرضه للمسؤول');
 
+  // ---------------------------------------------- السجلّ والحوكمة
+  section('السجلّ والحوكمة');
+
+  // سجل التحقّق: الصفحة عامّة بلا جلسة، والأثر يُكتب من داخل الدالّة.
+  const beforeV = await db.withTenant(t.id, null, async (c) => {
+    const { rows } = await c.query('select count(*)::int n from verification_log');
+    return rows[0].n;
+  });
+  await client()('/verify?code=LA-YUJAD-0000');
+  const afterV = await db.withTenant(t.id, null, async (c) => {
+    const { rows } = await c.query(
+      `select count(*)::int n from verification_log where code_tried = 'LA-YUJAD-0000'`);
+    return rows[0].n;
+  });
+  ok(afterV >= 1, 'رمزٌ لا يُطابق شيئًا يُسجَّل — وهذا ما يُظهر التحسّس حين يقع');
+
+  const vNoTenant = await db.withTenant(t.id, null, async (c) => {
+    const { rows } = await c.query('select count(*)::int n from verification_log');
+    return rows[0].n;
+  });
+  ok(vNoTenant >= beforeV, 'والسجلّ يُقرأ داخل الجهة');
+
+  // لقطة الامتثال
+  const snap = await admin('/api/admin/governance', {
+    method: 'POST', body: { action: 'snapshot' },
+  });
+  ok(snap.json?.ok && snap.json.rows >= 1, 'ولقطة الشهر تُلتقط');
+
+  const badPeriod = await admin('/api/admin/governance', {
+    method: 'POST', body: { action: 'snapshot', period: 'نوفمبر' },
+  });
+  ok(badPeriod.status === 400, 'وصيغة شهر غير YYYY-MM تُردّ');
+
+  // الالتقاط مرّتين لا يضاعف صفًّا: القيد على (الجهة، الشهر، الإدارة، الدورة)
+  // و nulls not distinct يجعل «بلا إدارة» صفًّا واحدًا لا صفًّا جديدًا كل مرّة.
+  const rows1 = await db.withTenant(t.id, null, async (c) =>
+    (await c.query('select count(*)::int n from compliance_snapshot')).rows[0].n);
+  await admin('/api/admin/governance', { method: 'POST', body: { action: 'snapshot' } });
+  const rows2 = await db.withTenant(t.id, null, async (c) =>
+    (await c.query('select count(*)::int n from compliance_snapshot')).rows[0].n);
+  ok(rows1 === rows2, 'والالتقاط المتكرّر يُحدِّث ولا يُضاعف');
+
+  // المنظر القديم أُعيد بناؤه فوق الجديد — فليتطابق المجموعان.
+  const agree = await db.withTenant(t.id, null, async (c) => {
+    const { rows } = await c.query(`
+      select (select coalesce(sum(enrolments),0) from department_progress) as a,
+             (select coalesce(sum(enrolments),0) from department_course_progress) as b`);
+    return rows[0].a === rows[0].b;
+  });
+  ok(agree, 'ومنظر الإدارات مجموعُ منظر (الإدارة، الدورة) — تعريفٌ واحد لا اثنان');
+
+  // قاعدة الاحتفاظ: معطَّلة عند الإنشاء، ولا تحذف قبل التفعيل.
+  const rule = await db.withTenant(t.id, null, async (c) => {
+    const { rows } = await c.query(
+      `select is_active, retain_months from retention_rule where entity_name='watch_heartbeat'`);
+    return rows[0];
+  });
+  ok(rule && rule.is_active === false && rule.retain_months === 3,
+     'وقاعدة احتفاظ النبضات موجودة ومعطَّلة — الحذف لا يأتي من ترحيل');
+
+  const runOff = await admin('/api/admin/governance', {
+    method: 'POST', body: { action: 'retention-run', entity: 'watch_heartbeat' },
+  });
+  ok(runOff.status === 400 && /معطَّلة/.test(runOff.json?.error || ''),
+     'وتشغيلها قبل التفعيل يُردّ');
+
+  const turnedOn = await admin('/api/admin/governance', {
+    method: 'POST', body: { action: 'retention-toggle', entity: 'watch_heartbeat', isActive: true },
+  });
+  ok(turnedOn.json?.rule?.is_active === true, 'وتُفعَّل بقرار');
+
+  // نبضة قديمة مزروعة تُحذف، وتقدّم الدرس لا يُمسّ — الحُجّة تبقى.
+  const seeded = await db.withTenant(t.id, null, async (c) => {
+    const { rows: e } = await c.query('select id, lesson_id from lesson_progress limit 1');
+    if (!e[0]) return null;
+    const { rows: en } = await c.query(
+      'select enrolment_id from lesson_progress where id = $1', [e[0].id]);
+    await c.query(`insert into watch_heartbeat (tenant_id, enrolment_id, lesson_id,
+                     position_sec, created_at)
+                   values (current_tenant(), $1, $2, 5, now() - interval '400 days')`,
+      [en[0].enrolment_id, e[0].lesson_id]);
+    const { rows: lp } = await c.query(
+      'select watched_sec, completed_at from lesson_progress where id = $1', [e[0].id]);
+    return { progressBefore: lp[0] };
+  });
+
+  if (seeded) {
+    const ran = await admin('/api/admin/governance', {
+      method: 'POST', body: { action: 'retention-run', entity: 'watch_heartbeat' },
+    });
+    ok(ran.json?.ok && ran.json.deleted >= 1, 'وتشغيلها يحذف ما تجاوز القاعدة');
+    const kept = await db.withTenant(t.id, null, async (c) => {
+      const { rows } = await c.query(`select count(*)::int n from watch_heartbeat
+                                       where created_at < now() - interval '3 months'`);
+      const { rows: lp } = await c.query(
+        'select watched_sec, completed_at from lesson_progress limit 1');
+      return { old: rows[0].n, lp: lp[0] };
+    });
+    ok(kept.old === 0, 'ولا يبقى ما هو أقدم من القاعدة');
+    ok(String(kept.lp.watched_sec) === String(seeded.progressBefore.watched_sec),
+       'وتقدّم الدرس لم يُمسّ — الحذف يُسقط التفصيل لا الحُجّة');
+    const logged = await db.withTenant(t.id, null, async (c) =>
+      (await c.query(`select count(*)::int n from audit_log where action='retention.apply'`))
+        .rows[0].n);
+    ok(logged >= 1, 'والحذف نفسه مكتوبٌ في سجلّ التدقيق');
+  }
+
+  await admin('/api/admin/governance', {
+    method: 'POST', body: { action: 'retention-toggle', entity: 'watch_heartbeat', isActive: false },
+  });
+
+  const govDenied = await back('/api/admin/governance', {
+    method: 'POST', body: { action: 'snapshot' },
+  });
+  ok(govDenied.status === 403, 'ومتعلّم لا يلتقط لقطة ولا يحذف');
+  const govPage = await admin('/admin/governance');
+  ok(govPage.status === 200 && govPage.text.includes('سجل التحقّق'),
+     'وصفحة الحوكمة تُعرض للمسؤول');
+
   section('استيراد دفعة من ملف');
   const BULK_A = `bulk1+${Date.now()}@alain.example`;
   const BULK_B = `bulk2+${Date.now()}@alain.example`;
