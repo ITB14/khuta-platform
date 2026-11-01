@@ -38,11 +38,13 @@ export default async function EditLearner({ params }) {
                  and lp.completed_at is not null)::int as done
         from enrolment e join course co on co.id = e.course_id
        where e.user_id = $1 order by e.due_at nulls last`, [id]);
-    return { learner: rows[0], enrol };
+    const { rows: departments } = await c.query(
+      `select id, name_ar from department where is_active order by name_ar`);
+    return { learner: rows[0], enrol, departments };
   });
 
   if (!data) notFound();
-  const { learner, enrol } = data;
+  const { learner, enrol, departments } = data;
 
   return (
     <>
@@ -63,7 +65,7 @@ export default async function EditLearner({ params }) {
             إدارة الأدوار تمرّ بـ<span className="ltr"> scripts/grant_role.js</span>.
           </div>
         ) : (
-          <EditLearnerForm learner={learner} />
+          <EditLearnerForm learner={learner} departments={departments} />
         )}
 
         <div className="card" style={{ marginTop: 16 }}>

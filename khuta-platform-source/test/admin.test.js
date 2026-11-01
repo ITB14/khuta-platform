@@ -105,6 +105,70 @@ async function signIn(call, email, password, secret) {
   ok(roster.status === 200, 'صفحة الإدارة تُعرض له');
   ok(roster.text.includes('سالم محمد الكعبي'), 'والقائمة تحمل المتعلّمين فعلًا');
 
+  // ------------------------------------------------------------- الإدارات
+  section('الإدارات');
+  // فحص الـ403 للمتعلّم يأتي لاحقًا مع `back`: الجلسة المسمّاة learner هنا
+  // صارت إدارية بعد setAdmin، والأدوار تُقرأ مع كل طلب.
+  // 409 هنا ليس فشلًا: المجموعة تُعاد على قاعدة لم تُصفَّر، والمطلوب وجودها.
+  for (const n of ['الموارد البشرية', 'الشؤون الهندسية', 'الصحة العامة']) {
+    const r = await admin('/api/admin/departments', { method: 'POST', body: { nameAr: n } });
+    if (!r.json?.ok && r.status !== 409) ok(false, `تعذّر إنشاء ${n}: ${r.json?.error}`);
+  }
+  ok(true, 'ثلاث إدارات موجودة');
+
+  // التكرار هو العلّة التي وُجد الجدول لأجلها، فيُردّ بالاسم لا برمز خطأ.
+  const dupDept = await admin('/api/admin/departments', {
+    method: 'POST', body: { nameAr: ' الصحة العامة ' },
+  });
+  ok(dupDept.status === 409 && /الصحة العامة/.test(dupDept.json?.error || ""),
+     'واسم مكرّر يُردّ — وهذا ما يمنع «الصحة العامة» و«الصحة العامة والبيئة» من التكاثر');
+
+  const list = await admin('/api/admin/departments');
+  const hr = list.json.departments.find((d) => d.name_ar === 'الموارد البشرية');
+  ok(!!hr && hr.is_active && hr.learners === 0, 'والقائمة تعود بها وبعدد موظفيها');
+
+  const renamed = await admin(`/api/admin/departments/${hr.id}`, {
+    method: 'PATCH', body: { nameAr: 'إدارة الموارد البشرية' },
+  });
+  ok(renamed.json?.department?.name_ar === 'إدارة الموارد البشرية', 'وتُعاد تسميتها');
+  await admin(`/api/admin/departments/${hr.id}`, {
+    method: 'PATCH', body: { nameAr: 'الموارد البشرية' },
+  });
+
+  const off = await admin(`/api/admin/departments/${hr.id}`, {
+    method: 'PATCH', body: { isActive: false },
+  });
+  ok(off.json?.department?.is_active === false, 'وتُعطَّل');
+  await admin(`/api/admin/departments/${hr.id}`, { method: 'PATCH', body: { isActive: true } });
+
+  const cycle = await admin(`/api/admin/departments/${hr.id}`, {
+    method: 'PATCH', body: { parentId: hr.id },
+  });
+  ok(cycle.status === 400, 'ولا تكون أبًا لنفسها');
+
+  // الدمج: ما يُصلح الازدواج الذي سبق الجدول. يُنقل الموظفون ثم تُعطَّل
+  // المصدر — فلا يبقى موظف معلّقًا بإدارة لا تظهر في قائمة.
+  const all = (await admin('/api/admin/departments')).json.departments;
+  const src = all.find((d) => d.name_ar === 'الصحة العامة');
+  const dst = all.find((d) => d.name_ar === 'الصحة العامة والبيئة');
+  const before = src.learners;
+  ok(before > 0 && !!dst, 'إدارتان متشابهتان وكلٌّ منهما تحمل موظفًا');
+
+  ok((await admin(`/api/admin/departments/${src.id}/merge`,
+      { method: 'POST', body: { intoId: src.id } })).status === 400,
+     'ولا تُدمج إدارة في نفسها');
+
+  const merged = await admin(`/api/admin/departments/${src.id}/merge`, {
+    method: 'POST', body: { intoId: dst.id },
+  });
+  ok(merged.json?.ok && merged.json.moved === before,
+     `ودمجُهما نقل ${merged.json?.moved} موظفًا`);
+
+  const deptsAfter = (await admin('/api/admin/departments')).json.departments;
+  const srcAfter = deptsAfter.find((d) => d.id === src.id);
+  ok(srcAfter.learners === 0 && srcAfter.is_active === false,
+     'والمصدر فارغ ومعطَّل — لا محذوف، فتقارير الأمس تبقى مفهومة');
+
   section('إنشاء متعلّم من الواجهة');
   const made = await admin('/api/admin/learners', {
     method: 'POST',
@@ -257,7 +321,8 @@ async function signIn(call, email, password, secret) {
   const BULK_B = `bulk2+${Date.now()}@alain.example`;
   const csvIn = [
     'الاسم,البريد,الإدارة',
-    `خالد سعيد النعيمي,${BULK_A},الصحة العامة`,
+    // الاسم الباقي بعد الدمج أعلاه — والمدموجة صارت معطّلة فلا تُطابَق.
+    `خالد سعيد النعيمي,${BULK_A},الصحة العامة والبيئة`,
     `عائشة راشد الظاهري,${BULK_B},التخطيط`,
     `مكرّر,${BULK_A},س`,
     'بلا بريد,,س',
@@ -265,6 +330,10 @@ async function signIn(call, email, password, secret) {
   ].join('\n');
   const bulkDenied = await back('/api/admin/learners/bulk', { method: 'POST', body: { csv: csvIn } });
   ok(bulkDenied.status === 403, 'متعلّم لا يستورد');
+  const deptDenied = await back('/api/admin/departments', {
+    method: 'POST', body: { nameAr: 'إدارة متسلّلة' },
+  });
+  ok(deptDenied.status === 403, 'ولا ينشئ إدارة');
 
   const bulk = await admin('/api/admin/learners/bulk', { method: 'POST', body: { csv: csvIn } });
   ok(bulk.status === 200 && bulk.json.created === 2, 'صفّان صحيحان أُنشئا');
@@ -275,6 +344,18 @@ async function signIn(call, email, password, secret) {
   ok(bulk.json.results.filter((r) => !r.ok).every((r) => r.line >= 2),
      'وكل فشل يحمل رقم سطره في الملف');
   ok((await roles(BULK_A)).join() === 'learner', 'والمستورَد دوره learner');
+
+  // الإدارة المعروفة تُربط، وغير المعروفة لا تُسقط الموظف ولا تُنشأ ضمنًا:
+  // الحساب يُنشأ بلا إدارة ويُقال ذلك في سطره.
+  const okRows = bulk.json.results.filter((r) => r.ok);
+  const linked = okRows.find((r) => r.email === BULK_A);
+  const warned = okRows.find((r) => r.email === BULK_B);
+  ok(!linked.warn, 'وصاحب الإدارة المعروفة أُنشئ بلا ملاحظة');
+  ok(warned && /التخطيط/.test(warned.warn || ''),
+     'وصاحب الإدارة المجهولة أُنشئ ومعه ملاحظة باسمها — لا فشل ولا إدارة مخترَعة');
+  const madeDepts = (await admin('/api/admin/departments')).json.departments;
+  ok(!madeDepts.some((d) => d.name_ar === 'التخطيط'),
+     'ولم يُنشئ الملفُّ إدارةً — وإلّا تكاثرت الإدارات من أخطاء الطباعة');
 
   const bulkNoCol = await admin('/api/admin/learners/bulk', {
     method: 'POST', body: { csv: 'الاسم,الإدارة\nس,ص' },

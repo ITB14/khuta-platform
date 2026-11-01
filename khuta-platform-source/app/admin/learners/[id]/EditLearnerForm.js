@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function EditLearnerForm({ learner }) {
+export default function EditLearnerForm({ learner, departments = [] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -62,8 +62,15 @@ export default function EditLearnerForm({ learner }) {
           </label>
           <label className="field">
             <span>الإدارة</span>
-            <input name="department" defaultValue={learner.department || ''}
-                   autoComplete="off" data-testid="e-dept" />
+            <select name="department" defaultValue={learner.department || ''}
+                    data-testid="e-dept"
+                    style={{ width: '100%', padding: '11px 13px', borderRadius: 8,
+                             border: '1px solid var(--line)' }}>
+              <option value="">— بلا إدارة —</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.name_ar}>{d.name_ar}</option>
+              ))}
+            </select>
           </label>
           <label className="field">
             <span>المسمّى الوظيفي</span>

@@ -211,9 +211,13 @@ async function call(path, body, method = 'POST') {
   section('من تخطّى القياس القبلي');
   await db.withTenant(t.id, null, (c) => c.query(
     `delete from app_user where lower(email) = lower($1)`, [SKIPPER]));
-  const skipper = await db.withTenant(t.id, null, (c) => provision.provisionLearner(c, {
-    email: SKIPPER, fullNameAr: 'طارق سالم الكعبي', department: 'الخدمات',
-    cohort: 'TEST-OPEN', via: 'test' }));
+  const skipper = await db.withTenant(t.id, null, async (c) => {
+    await c.query(`insert into department (tenant_id, name_ar) values (current_tenant(), $1)
+                   on conflict (tenant_id, name_ar) do nothing`, ['الخدمات']);
+    return provision.provisionLearner(c, {
+      email: SKIPPER, fullNameAr: 'طارق سالم الكعبي', department: 'الخدمات',
+      cohort: 'TEST-OPEN', via: 'test' });
+  });
 
   const cut = await db.withTenant(t.id, null, async (c) => {
     const { rows } = await c.query(

@@ -102,6 +102,30 @@ export default function ImportForm({ courses }) {
           </div>
         ) : null}
 
+        {/* أُنشئ ومعه ملاحظة: ليس فشلًا فلا يُدرَج مع الفشل، وليس نجاحًا
+            صامتًا فيُخفى عن المسؤول إلى أن يكتشفه في تقرير ناقص. */}
+        {good.some((r) => r.warn) ? (
+          <div className="card" style={{ marginBottom: 16 }} data-testid="bulk-warnings">
+            <h3 style={{ marginBottom: 8 }}>أُنشئت مع ملاحظة</h3>
+            <table className="gain">
+              <thead><tr><th>السطر</th><th>البريد</th><th>الملاحظة</th></tr></thead>
+              <tbody>
+                {good.filter((r) => r.warn).map((r) => (
+                  <tr key={r.line}>
+                    <td className="num">{r.line}</td>
+                    <td className="ltr tiny">{r.email || '—'}</td>
+                    <td>{r.warn}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="tiny muted" style={{ marginTop: 10 }}>
+              أضف الإدارة من <Link href="/admin/departments">صفحة الإدارات</Link> ثم
+              أسنِد الموظف إليها من صفحته — لا حاجة لإعادة الاستيراد.
+            </p>
+          </div>
+        ) : null}
+
         {bad.length ? (
           <div className="card" style={{ marginBottom: 16 }} data-testid="bulk-errors">
             <h3 style={{ marginBottom: 8 }}>صفوف لم تُنشأ</h3>

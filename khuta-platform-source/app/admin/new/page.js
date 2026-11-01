@@ -15,9 +15,11 @@ export default async function NewLearner() {
   if (denial === 'signin') redirect('/signin');
   if (denial) redirect('/dashboard');
 
-  const courses = await db.withTenant(user.tenant.id, user.id, async (c) => {
-    const { rows } = await c.query('select code, title_ar from course order by title_ar');
-    return rows;
+  const { courses, departments } = await db.withTenant(user.tenant.id, user.id, async (c) => {
+    const { rows: courses } = await c.query('select code, title_ar from course order by title_ar');
+    const { rows: departments } = await c.query(
+      `select id, name_ar from department where is_active order by name_ar`);
+    return { courses, departments };
   });
 
   return (
@@ -32,13 +34,13 @@ export default async function NewLearner() {
         </p>
         <h1>إضافة متعلّم</h1>
         <p className="muted" style={{ marginBottom: 20 }}>
-          يُنشأ الحساب ويُسجَّل في الدورة ويبدأ من الصفر: لا درس مفتوح قبل التقييم القبلي.
+          يُنشأ الحساب ويُسجَّل في الدورة، فتُفتح له دروسها كلّها ويبدأ متى شاء.
         </p>
 
         {courses.length === 0 ? (
           <div className="card"><p>لا توجد دورات في هذه الجهة بعد.</p></div>
         ) : (
-          <NewLearnerForm courses={courses} />
+          <NewLearnerForm courses={courses} departments={departments} />
         )}
       </main>
     </>

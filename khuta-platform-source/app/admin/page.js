@@ -80,6 +80,7 @@ export default async function AdminHome() {
           <h1>المتعلّمون</h1>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <a className="linkbtn" href="/api/admin/export" data-testid="export">تصدير CSV</a>
+            <Link className="linkbtn" href="/admin/departments" data-testid="to-departments">الإدارات</Link>
             <Link className="linkbtn" href="/admin/import" data-testid="import">استيراد دفعة</Link>
             <Link className="btn gold" href="/admin/new" data-testid="add-learner">إضافة متعلّم</Link>
           </div>

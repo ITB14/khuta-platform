@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
-export default function NewLearnerForm({ courses }) {
+export default function NewLearnerForm({ courses, departments = [] }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [made, setMade] = useState(null);
@@ -79,9 +79,24 @@ export default function NewLearnerForm({ courses }) {
           <span>الرقم الوظيفي</span>
           <input name="employeeNo" dir="ltr" autoComplete="off" data-testid="f-emp" />
         </label>
+        {/* قائمة لا حقل حرّ: الكتابة الحرّة هي التي صنعت «الصحة العامة»
+            و«الصحة العامة والبيئة» صفّين في كل تقرير. */}
         <label className="field">
           <span>الإدارة</span>
-          <input name="department" autoComplete="off" data-testid="f-dept" />
+          {departments.length ? (
+            <select name="department" data-testid="f-dept"
+                    style={{ width: '100%', padding: '11px 13px', borderRadius: 8,
+                             border: '1px solid var(--line)' }}>
+              <option value="">— بلا إدارة —</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.name_ar}>{d.name_ar}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="tiny">
+              لا إدارات بعد — <Link href="/admin/departments">أضفها أوّلًا</Link>.
+            </span>
+          )}
         </label>
         <label className="field">
           <span>المسمّى الوظيفي</span>

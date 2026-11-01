@@ -19,6 +19,11 @@ const PASS = 'Munic1pality!Khuta';
   const t = await db.resolveTenant('alain.khuta.b14facilities.com');
   const out = await db.withTenant(t.id, null, async (c) => {
     await c.query('delete from app_user where lower(email)=lower($1)', [EMAIL]);
+    // الإدارات بيانات الجهة لا بياناتنا، فلا تُبذَر مع المنصة. وهذا متعلّم
+    // تجريبي، فتُنشأ إدارته هنا كما يُنشئها المسؤول من شاشة الإدارات.
+    await c.query(
+      `insert into department (tenant_id, name_ar) values (current_tenant(), $1)
+       on conflict (tenant_id, name_ar) do nothing`, ['الصحة العامة والبيئة']);
     const u = await identity.createUser(c, {
       email: EMAIL, fullNameAr: 'سالم محمد الكعبي', employeeNo: 'EMP-0001',
       department: 'الصحة العامة والبيئة', jobTitle: 'مهندس أول',

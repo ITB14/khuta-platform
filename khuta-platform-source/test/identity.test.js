@@ -30,8 +30,24 @@ const mail = `t${Date.now()}@alain.example`;
 
   section('إنشاء المستخدم وكلمة المرور');
   await db.withTenant(T, null, async (c) => {
+    // الإدارة صارت كيانًا لا نصًّا: تُنشأ قبل أن يُسنَد إليها أحد.
+    await c.query(`insert into department (tenant_id, name_ar) values (current_tenant(), $1)
+                   on conflict (tenant_id, name_ar) do nothing`, ['الصحة العامة']);
     user = await id.createUser(c, { email: mail, fullNameAr: 'سالم محمد الكعبي',
                                     department: 'الصحة العامة', employeeNo: 'EMP-9001' });
+    const { rows: dept } = await c.query(
+      'select department_id is not null as linked from app_user where id=$1', [user.id]);
+    ok(dept[0].linked, 'والاسم النصّي تُرجم إلى معرّف إدارة لا بقي نصًّا');
+
+    // نقطة حفظ: الرفض المتوقَّع يُجهض المعاملة، وما بعده في هذه الكتلة يحتاجها.
+    let rejected = false;
+    await c.query('savepoint before_bad_dept');
+    try {
+      await id.createUser(c, { email: 'ghost@alain.example', fullNameAr: 'ش',
+                               department: 'إدارة لا وجود لها' });
+    } catch (e) { rejected = /لا توجد إدارة/.test(e.message); }
+    await c.query('rollback to savepoint before_bad_dept');
+    ok(rejected, 'وإدارة غير معرّفة تُرفض باسمها — لا تُنشأ ضمنًا ولا تُحفظ نصًّا');
     ok(!!user.id && user.status === 'invited', 'المستخدم أُنشئ بحالة «مدعوّ»');
     ok(id.passwordProblems('short').length > 0, 'كلمة مرور ضعيفة تُرفض مع بيان السبب');
     ok(id.passwordProblems(PW).length === 0, 'وكلمة مرور قوية تُقبل');

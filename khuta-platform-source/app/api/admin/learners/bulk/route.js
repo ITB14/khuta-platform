@@ -44,6 +44,15 @@ export async function POST(req) {
   const dueDays = Number(b.dueDays);
   const due = Number.isFinite(dueDays) && dueDays > 0 && dueDays <= 365 ? dueDays : 21;
 
+  // الإدارات تُقرأ مرّة واحدة ويُطابَق عليها كل صفّ قبل الإنشاء. وإدارة لا
+  // تُعرف لا تُسقط الموظف: الحساب يُنشأ بلا إدارة ويُقال ذلك في سطره. أمّا
+  // إنشاء إدارة من خليّة في ملف فهو الطريق إلى أربعين نسخة من إدارة واحدة.
+  const known = await db.withTenant(actor.tenant.id, actor.id, async (c) => {
+    const { rows } = await c.query(
+      `select name_ar from department where is_active`);
+    return new Map(rows.map((r) => [r.name_ar, r.name_ar]));
+  });
+
   const seen = new Set();
   const results = [];
 
@@ -63,12 +72,18 @@ export async function POST(req) {
     }
     seen.add(email);
 
+    const wanted = (rec.department || '').trim();
+    const dept = wanted ? known.get(wanted) || null : null;
+    const warn = wanted && !dept
+      ? `الإدارة «${wanted}» غير معروفة — أُنشئ الحساب بلا إدارة`
+      : null;
+
     try {
       const made = await db.withTenant(actor.tenant.id, actor.id, (c) => provisionLearner(c, {
         email: rec.email,
         fullNameAr: rec.fullNameAr,
         employeeNo: rec.employeeNo,
-        department: rec.department,
+        department: dept,
         jobTitle: rec.jobTitle,
         courseCode,
         cohort: rec.cohort || cohortFallback,
@@ -76,7 +91,7 @@ export async function POST(req) {
         via: `admin-bulk:${actor.email}`,
       }));
       results.push({
-        line: rec.line, ok: true,
+        line: rec.line, ok: true, warn,
         email: made.email, fullNameAr: made.fullNameAr,
         password: made.password, mfaSecret: made.mfaSecret,
       });
