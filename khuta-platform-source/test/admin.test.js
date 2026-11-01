@@ -417,6 +417,83 @@ async function signIn(call, email, password, secret) {
   });
   ok(skillDenied.status === 403, 'ومتعلّم لا يضيف إلى الكتالوج');
 
+  // ------------------------------------------------ بنية الكتالوج
+  section('الكتالوج: التصنيف والمزوّد');
+  for (const [kind, nameAr] of [['category', 'أدوات العمل الرقمية'],
+                                ['category', 'السلامة والامتثال'],
+                                ['provider', 'معهد ابن خلدون']]) {
+    const r = await admin('/api/admin/catalogue', { method: 'POST', body: { kind, nameAr } });
+    if (!r.json?.ok && r.status !== 409) ok(false, `تعذّر إنشاء ${nameAr}: ${r.json?.error}`);
+  }
+  ok(true, 'تصنيفان ومزوّد في الكتالوج');
+
+  const badKind = await admin('/api/admin/catalogue', {
+    method: 'POST', body: { kind: 'course; drop table course', nameAr: 'س' },
+  });
+  ok(badKind.status === 400, 'ونوع غير معروف يُردّ — اسم الجدول من قائمة مغلقة لا من الطلب');
+
+  const dupTerm = await admin('/api/admin/catalogue', {
+    method: 'POST', body: { kind: 'category', nameAr: ' أدوات العمل الرقمية ' },
+  });
+  ok(dupTerm.status === 409, 'واسم مكرّر يُردّ — فلا يتكاثر التصنيف الواحد');
+
+  const cat = (await admin('/api/admin/catalogue')).json;
+  const digital = cat.categories.find((x) => x.name_ar === 'أدوات العمل الرقمية');
+  const safety = cat.categories.find((x) => x.name_ar === 'السلامة والامتثال');
+  const bki = cat.providers.find((x) => x.name_ar === 'معهد ابن خلدون');
+  const copilot = cat.courses[0];
+  ok(!!copilot && copilot.lessons === 8,
+     'والدورة القائمة تظهر في الكتالوج بعدد دروسها');
+
+  const classified = await admin(`/api/admin/courses/${copilot.course_id}`, {
+    method: 'PATCH', body: { categoryId: digital.id, providerId: bki.id },
+  });
+  ok(classified.json?.ok, 'وتُسنَد إليها التصنيف والمزوّد');
+
+  const afterCat = (await admin('/api/admin/catalogue')).json;
+  const co2 = afterCat.courses.find((c) => c.course_id === copilot.course_id);
+  ok(co2.category_ar === 'أدوات العمل الرقمية' && co2.provider_ar === 'معهد ابن خلدون',
+     'والمنظر يعيدهما بالاسم لا بالمعرّف');
+  ok(afterCat.categories.find((x) => x.id === digital.id).courses === 1,
+     'وعدّ الدورات في التصنيف يتبع الإسناد');
+
+  // التعطيل: يمنع إسنادًا جديدًا ولا يمسّ ما أُسند.
+  await admin(`/api/admin/catalogue/${safety.id}`, {
+    method: 'PATCH', body: { kind: 'category', isActive: false },
+  });
+  const onRetiredCat = await admin(`/api/admin/courses/${copilot.course_id}`, {
+    method: 'PATCH', body: { categoryId: safety.id },
+  });
+  ok(onRetiredCat.status === 400, 'وتصنيف معطَّل لا يُسنَد');
+  await admin(`/api/admin/catalogue/${safety.id}`, {
+    method: 'PATCH', body: { kind: 'category', isActive: true },
+  });
+
+  const ghostCat = await admin(`/api/admin/courses/${copilot.course_id}`, {
+    method: 'PATCH', body: { categoryId: '00000000-0000-0000-0000-000000000000' },
+  });
+  ok(ghostCat.status === 404, 'وتصنيف لا وجود له يُردّ قبل الكتابة');
+
+  // فكّ الإسناد: فارغ يعني «بلا»، لا معرّفًا فارغًا.
+  await admin(`/api/admin/courses/${copilot.course_id}`,
+              { method: 'PATCH', body: { providerId: '' } });
+  const unset = (await admin('/api/admin/catalogue')).json.courses
+    .find((c) => c.course_id === copilot.course_id);
+  ok(unset.provider_id === null && unset.category_ar === 'أدوات العمل الرقمية',
+     'وتفريغ أحدهما لا يمسّ الآخر');
+  await admin(`/api/admin/courses/${copilot.course_id}`,
+              { method: 'PATCH', body: { providerId: bki.id } });
+
+  const catDenied = await back('/api/admin/catalogue', {
+    method: 'POST', body: { kind: 'category', nameAr: 'تصنيف متسلّل' },
+  });
+  ok(catDenied.status === 403, 'ومتعلّم لا يضيف تصنيفًا');
+  ok((await back('/admin/catalogue')).status !== 200, 'ولا يفتح صفحة الكتالوج');
+
+  const catPage = await admin('/admin/catalogue');
+  ok(catPage.status === 200 && catPage.text.includes('أدوات العمل الرقمية'),
+     'وصفحة الكتالوج تعرضه للمسؤول');
+
   section('استيراد دفعة من ملف');
   const BULK_A = `bulk1+${Date.now()}@alain.example`;
   const BULK_B = `bulk2+${Date.now()}@alain.example`;

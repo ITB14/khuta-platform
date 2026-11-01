@@ -74,6 +74,12 @@ button,input{font-family:inherit;font-size:inherit}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;box-shadow:var(--shadow)}
 .grid{display:grid;gap:16px}
 .g3{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+/* قائمة إسناد داخل جدول: بعرض ما تحمله لا بعرض العمود */
+.pick{padding:7px 9px;border:1px solid var(--line);border-radius:var(--r-sm);
+  background:#fff;color:var(--ink);font-family:inherit;font-size:13.5px;max-width:200px}
+.pick:focus{border-color:var(--gold);outline:none}
+.pick[disabled]{opacity:.5}
 .between{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 
 .btn{background:var(--black);color:#fff;border:1px solid var(--black);border-radius:var(--r-sm);padding:11px 20px;font-weight:600;font-size:14.5px;cursor:pointer}
