@@ -84,6 +84,9 @@ export default async function Dashboard() {
         {A.isAdmin(user) ? (
           <Link className="linkbtn" href="/admin" data-testid="to-admin">المتعلّمون</Link>
         ) : null}
+        {A.isStaff(user) ? (
+          <Link className="linkbtn" href="/academy/needs" data-testid="to-needs">الاحتياج التدريبي</Link>
+        ) : null}
         <NotificationBell count={unread} />
         <Link className="linkbtn" href="/profile" data-testid="to-profile">ملفّي</Link>
         <Link className="linkbtn" href="/account/password" data-testid="to-password">كلمة المرور</Link>

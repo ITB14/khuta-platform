@@ -27,8 +27,13 @@ alter type app_role add value if not exists 'provider_user';
 
 -- مرجعٌ للمفاتيح المركّبة أدناه. بدونه يمكن ربط رئيسٍ من جهةٍ بإدارة جهةٍ
 -- أخرى، والعزل قائم فلا يراه أحد حتى يقع.
-alter table app_user drop constraint if exists app_user_tenant_id_uq;
-alter table app_user add  constraint app_user_tenant_id_uq unique (tenant_id, id);
+-- يُضاف إن غاب ولا يُسقَط ثمّ يُضاف: مفاتيح أجنبية لاحقة تعتمد عليه، فإسقاطه
+-- يُفشل إعادة تشغيل هذا الملف.
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'app_user_tenant_id_uq') then
+    alter table app_user add constraint app_user_tenant_id_uq unique (tenant_id, id);
+  end if;
+end $$;
 
 -- --------------------------------------------------- رئاسة الإدارة --------
 -- جدولٌ لا عمودٌ على الإدارة: لإدارةٍ رئيسان في فترة تسليم، ولرئيسٍ إدارتان

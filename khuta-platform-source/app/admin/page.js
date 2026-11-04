@@ -83,6 +83,7 @@ export default async function AdminHome() {
           <h1>المتعلّمون</h1>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <a className="linkbtn" href="/api/admin/export" data-testid="export">تصدير CSV</a>
+            <Link className="linkbtn" href="/academy/needs" data-testid="to-needs">الاحتياج</Link>
             <Link className="linkbtn" href="/admin/governance" data-testid="to-governance">الحوكمة</Link>
             <Link className="linkbtn" href="/admin/catalogue" data-testid="to-catalogue">الكتالوج</Link>
             <Link className="linkbtn" href="/admin/skills" data-testid="to-skills">المهارات</Link>
