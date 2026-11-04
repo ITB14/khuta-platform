@@ -68,12 +68,21 @@ async function currentUser() {
       select coalesce((select array_agg(g.role::text order by g.role)
                          from user_role_grant g where g.user_id = $1), '{}') as roles,
              coalesce((select cr.must_change
-                         from user_credential cr where cr.user_id = $1), false) as must_change`,
+                         from user_credential cr where cr.user_id = $1), false) as must_change,
+             -- الإدارات التي يرأسها، للعنونة في الواجهة فقط. مدى ما يراه
+             -- تفرضه قاعدة البيانات لا هذه القائمة، فلا يُبنى عليها حاجز.
+             coalesce((select jsonb_agg(jsonb_build_object('id', d.id, 'name', d.name_ar)
+                                        order by d.name_ar)
+                         from department_head h
+                         join department d
+                           on d.tenant_id = h.tenant_id and d.id = h.department_id
+                        where h.user_id = $1), '[]'::jsonb) as headed`,
       [s.user.id]);
     return {
       ...s.user, tenant,
       roles: rows[0].roles,
       mustChangePassword: rows[0].must_change,
+      headedDepartments: rows[0].headed,
     };
   });
 }
